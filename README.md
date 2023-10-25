@@ -1,0 +1,2 @@
+# rich
+First NES game
