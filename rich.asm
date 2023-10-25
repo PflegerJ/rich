@@ -15,8 +15,16 @@
     .byte   $00, $00, $00, $00, $00  ; padding
 
 .segment "ZEROPAGE"
+    ;; Variables
+    ;; Constants
 .segment "STARTUP"
 .segment "CODE"
+
+    ;; Subroutines
+vblankwait:
+    bit $2002   
+    bpl vblankwait
+    rts
 
 reset:
     sei			; disable IRQs
@@ -31,9 +39,7 @@ reset:
 	stx	$4010		; disable DMC IRQs
 
 	;; first wait for vblank to make sure PPU is ready
-vblankwait1:
-	bit	$2002
-	bpl	vblankwait1
+    jsr vblankwait:
 
 clear_memory:
 	lda	#$00
@@ -54,9 +60,19 @@ clear_memory:
 
 
 	;; second wait for vblank, PPU is ready after this 
-vblankwait2:
-	bit	$2002
-	bpl	vblankwait2
+    jsr vblankwait
+
+    ; load initial sprite info
+
+forever:
+    jmp forever
+
+;;;;;; vblank loop - called every frame ;;;;;
+VBLANK:
+    
 
 .segment "VECTORS"
+    .word VBLANK
+    .word RESET
+    .word 0
 .segment "CHARS"
