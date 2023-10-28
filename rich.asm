@@ -17,9 +17,25 @@
 .segment "STARTUP"
 .segment "ZEROPAGE"
     ;; Variables
-    pointerLo:   .res 1  ; pointer variables are declared in RAM
-    pointerHi:   .res 1  ; low byte first, high byte immediately after
+    pointerLo:      .res 1  ; pointer variables are declared in RAM
+    pointerHi:      .res 1  ; low byte first, high byte immediately after
+    controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
     ;; Constants
+
+    PPU_CTRL_REG1         = $2000
+    PPU_CTRL_REG2         = $2001
+    PPU_STATUS            = $2002
+    PPU_SPR_ADDR          = $2003
+    PPU_SPR_DATA          = $2004
+    PPU_SCROLL_REG        = $2005
+    PPU_ADDRESS           = $2006
+    PPU_DATA              = $2007
+
+    SPR_DMA               = $4014
+    JOYPAD_PORT           = $4016
+    JOYPAD_PORT1          = $4016
+    JOYPAD_PORT2          = $4017
+    
    ; WALL_TILE   = $85
   ;  RIGHT_WALL  = $E5
    ; TOP_WALL    = $20
@@ -31,20 +47,20 @@
 
     ;; Subroutines
 vblankwait: 
-    bit $2002   
+    bit PPU_STATUS   
     bpl vblankwait
     rts
 
 loadpalettes:
-    LDA $2002
+    LDA PPU_STATUS
     LDA #$3f
-    STA $2006
+    STA PPU_ADDRESS
     LDA #$00
-    STA $2006
+    STA PPU_ADDRESS
     LDX #$00
 loadpalettesloop:
     LDA palette,X   ; load data from adddress (palette + X)
-    STA $2007
+    STA PPU_DATA
     INX 
     CPX #$20
     BNE loadpalettesloop
@@ -52,11 +68,11 @@ loadpalettesloop:
 
 ;;; Using nested loops to load the background efficiently ;;;
 loadbackground:
-    LDA $2002               ; read PPU status to reset the high/low latch
+    LDA PPU_STATUS               ; read PPU status to reset the high/low latch
     LDA #$20
-    STA $2006               ; write high byte of $2000 address
+    STA PPU_ADDRESS              ; write high byte of $2000 address
     LDa #$00
-    STA $2006               ; write low byte of $2000 address
+    STA PPU_ADDRESS             ; write low byte of $2000 address
 
     LDA #<background 
     STA pointerLo           ; put the low byte of address of background into pointer
@@ -69,7 +85,7 @@ outsideloop:
 
 insideloop:
     LDA (pointerLo),Y       ; copy one background byte from address in pointer + Y
-    STA $2007               ; runs 256*4 times
+    STA PPU_DATA              ; runs 256*4 times
 
     INY                     ; inside loop counter
     CPY #$00                
@@ -83,18 +99,23 @@ insideloop:
     rts
 
 loadattribute:
-    LDA $2002
+    LDA PPU_STATUS
     LDA #$23    ; high byte of $23C0
-    STA $2006
+    STA PPU_ADDRESS
     LDA #$C0    ; low byte
-    STA $2006
+    STA PPU_ADDRESS
     LDX #$00
 :
     LDA attributes,X
-    STA $2007   ; write to PPU
+    STA PPU_DATA   ; write to PPU
     INX 
     CPX #$40    ; copying 8 bytes of data
     BNE :-
+    rts
+
+read_controller_input:
+    ;; latch the controllers
+    ;; read each button and store in controller byte
     rts
 
 RESET:
@@ -105,8 +126,8 @@ RESET:
 	ldx	#$ff		; Set up stack
 	txs			;  +
 	inx			; now X = 0
-	stx	$2000		; disable NMI
-	stx	$2001		; disable rendering
+	stx	PPU_CTRL_REG1		; disable NMI
+	stx	PPU_CTRL_REG2		; disable rendering
 	stx	$4010		; disable DMC IRQs
 
 	;; first wait for vblank to make sure PPU is ready
@@ -134,16 +155,16 @@ clearmem:
     NOP 
 
 clearnametables:
-    LDA $2002   ; reset PPU status
+    LDA PPU_STATUS   ; reset PPU status
     LDA #$20
-    STA $2006
+    STA PPU_ADDRESS
     LDA #$00
-    STA $2006
+    STA PPU_ADDRESS
     LDX #$08
     LDY #$00
     LDA #$24    ; clear background tile
 :
-    STA $2007
+    STA PPU_DATA
     DEY 
     BNE :-
     DEX 
@@ -169,13 +190,13 @@ loadspritesloop:
 
     CLI 
     LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
-    STA $2000
+    STA PPU_CTRL_REG1
     LDA #%00001110  ; background and sprites enable, no left clipping
-    STA $2001
+    STA PPU_CTRL_REG2
 
     LDA #$00    ; reset scroll address 
-    STA $2005
-    sta $2005
+    STA PPU_SCROLL_REG
+    sta PPU_SCROLL_REG
     
 forever:
     jmp forever
@@ -307,8 +328,46 @@ sprites:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  Hit table for default background collisions
+;;      - each bit represent the tile in that location
+;;      - 0: collision off      1: collision on
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 hitTable:
+    .byte %00000000, %00000000, %00000000, %00000000
+    .byte %00000000, %00000000, %00000000, %00000000
+    .byte %00001111, %11111111, %11111111, %11110000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001111, %11111111, %11111111, %11110000
+
+    .byte %00000000, %00000000, %00000000, %00000000
     .byte %00000000, %00000000, %00000000, %00000000
 
 
