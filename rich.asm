@@ -30,9 +30,71 @@
 .segment "CODE"
 
     ;; Subroutines
-vblankwait:
+vblankwait: 
     bit $2002   
     bpl vblankwait
+    rts
+
+loadpalettes:
+    LDA $2002
+    LDA #$3f
+    STA $2006
+    LDA #$00
+    STA $2006
+    LDX #$00
+loadpalettesloop:
+    LDA palette,X   ; load data from adddress (palette + X)
+    STA $2007
+    INX 
+    CPX #$20
+    BNE loadpalettesloop
+    Rts
+
+;;; Using nested loops to load the background efficiently ;;;
+loadbackground:
+    LDA $2002               ; read PPU status to reset the high/low latch
+    LDA #$20
+    STA $2006               ; write high byte of $2000 address
+    LDa #$00
+    STA $2006               ; write low byte of $2000 address
+
+    LDA #<background 
+    STA pointerLo           ; put the low byte of address of background into pointer
+    LDA #>background        ; #> is the same as HIGH() function in NESASM, used to get the high byte
+    STA pointerHi           ; put high byte of address into pointer
+
+    LDX #$00                ; start at pointer + 0
+    LDY #$00
+outsideloop:
+
+insideloop:
+    LDA (pointerLo),Y       ; copy one background byte from address in pointer + Y
+    STA $2007               ; runs 256*4 times
+
+    INY                     ; inside loop counter
+    CPY #$00                
+    BNE insideloop          ; run inside loop 256 times before continuing
+
+    INC pointerHi           ; low byte went from 0 -> 256, so high byte needs to be changed now
+
+    INX                     ; increment outside loop counter
+    CPX #$04                ; needs to happen $04 times, to copy 1KB data
+    BNE outsideloop    
+    rts
+
+loadattribute:
+    LDA $2002
+    LDA #$23    ; high byte of $23C0
+    STA $2006
+    LDA #$C0    ; low byte
+    STA $2006
+    LDX #$00
+:
+    LDA attributes,X
+    STA $2007   ; write to PPU
+    INX 
+    CPX #$40    ; copying 8 bytes of data
+    BNE :-
     rts
 
 RESET:
@@ -87,23 +149,8 @@ clearnametables:
     DEX 
     BNE :-
 
-loadpalettes:
-    LDA $2002
-    LDA #$3f
-    STA $2006
-    LDA #$00
-    STA $2006
-    LDX #$00
-loadpalettesloop:
-    LDA palette,X   ; load data from adddress (palette + X)
-                        ; 1st time through loop it will load palette+0
-                        ; 2nd time through loop it will load palette+1
-                        ; 3rd time through loop it will load palette+2
-                        ; etc
-    STA $2007
-    INX 
-    CPX #$20
-    BNE loadpalettesloop
+    jsr loadpalettes
+
 
 loadsprites:
     LDX #$00
@@ -114,51 +161,10 @@ loadspritesloop:
     CPX #$10
     BNE loadspritesloop 
 
-;;; Using nested loops to load the background efficiently ;;;
-loadbackground:
-    LDA $2002               ; read PPU status to reset the high/low latch
-    LDA #$20
-    STA $2006               ; write high byte of $2000 address
-    LDa #$00
-    STA $2006               ; write low byte of $2000 address
+    jsr loadbackground
 
-    LDA #<background 
-    STA pointerLo           ; put the low byte of address of background into pointer
-    LDA #>background        ; #> is the same as HIGH() function in NESASM, used to get the high byte
-    STA pointerHi           ; put high byte of address into pointer
+    jsr loadattribute
 
-    LDX #$00                ; start at pointer + 0
-    LDY #$00
-outsideloop:
-
-insideloop:
-    LDA (pointerLo),Y       ; copy one background byte from address in pointer + Y
-    STA $2007               ; runs 256*4 times
-
-    INY                     ; inside loop counter
-    CPY #$00                
-    BNE insideloop          ; run inside loop 256 times before continuing
-
-    INC pointerHi           ; low byte went from 0 -> 256, so high byte needs to be changed now
-
-    INX                     ; increment outside loop counter
-    CPX #$04                ; needs to happen $04 times, to copy 1KB data
-    BNE outsideloop    
-
- 
-loadattribute:
-    LDA $2002
-    LDA #$23    ; high byte of $23C0
-    STA $2006
-    LDA #$C0    ; low byte
-    STA $2006
-    LDX #$00
-:
-    LDA attributes,X
-    STA $2007   ; write to PPU
-    INX 
-    CPX #$40    ; copying 8 bytes of data
-    BNE :-
 
 
     CLI 
@@ -176,7 +182,6 @@ forever:
 
 ;;;;;; vblank loop - called every frame ;;;;;
 VBLANK:
-
 
     RTI
 
@@ -298,6 +303,13 @@ sprites:
     .byte $10, $05, $00, $10
     .byte $18, $06, $00, $08
     .byte $18, $07, $00, $10
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  Hit table for default background collisions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+hitTable:
+    .byte %00000000, %00000000, %00000000, %00000000
 
 
 .segment "VECTORS"
