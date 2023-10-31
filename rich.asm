@@ -19,7 +19,13 @@
     ;; Variables
     pointerLo:      .res 1  ; pointer variables are declared in RAM
     pointerHi:      .res 1  ; low byte first, high byte immediately after
+    blANK:          .res 8
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
+    playerXpos:     .res 1
+    playerYpos:     .res 1
+    nameTable:      .res 1  ; which nametable to load
+    roomIndex:      .res 1
+    temp:           .res 1
     ;; Constants
 
     PPU_CTRL_REG1         = $2000
@@ -68,16 +74,24 @@ loadpalettesloop:
 
 ;;; Using nested loops to load the background efficiently ;;;
 loadbackground:
+    LDA #%00010000  ; disable NMI, sprites from pattern table 0, background from 1
+    sta	PPU_CTRL_REG1		        ; disable NMI
+    lda #$00
+    sta PPU_CTRL_REG2
+
+    jsr vblankwait
+
     LDA PPU_STATUS               ; read PPU status to reset the high/low latch
     LDA #$20
     STA PPU_ADDRESS              ; write high byte of $2000 address
     LDa #$00
     STA PPU_ADDRESS             ; write low byte of $2000 address
 
-    LDA #<background 
-    STA pointerLo           ; put the low byte of address of background into pointer
-    LDA #>background        ; #> is the same as HIGH() function in NESASM, used to get the high byte
-    STA pointerHi           ; put high byte of address into pointer
+    ldx roomIndex
+    lda RoomTableLo, x
+    sta pointerLo
+    lda RoomTableHi, X
+    sta pointerHi
 
     LDX #$00                ; start at pointer + 0
     LDY #$00
@@ -96,6 +110,19 @@ insideloop:
     INX                     ; increment outside loop counter
     CPX #$04                ; needs to happen $04 times, to copy 1KB data
     BNE outsideloop    
+
+    jsr vblankwait
+
+    jsr loadattribute
+
+    LDA #$00
+    sta PPU_SCROLL_REG
+    sta PPU_SCROLL_REG
+        
+    LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
+    STA PPU_CTRL_REG1
+    LDA #%00011110  ; background and sprites enable, no left clipping
+    STA PPU_CTRL_REG2
     rts
 
 loadattribute:
@@ -113,9 +140,147 @@ loadattribute:
     BNE :-
     rts
 
-read_controller_input:
-    ;; latch the controllers
-    ;; read each button and store in controller byte
+readcontroller1:
+    LDA #$01
+    STA $4016
+    LDA #$00
+    STA $4016
+    LDX #$08
+readcontroller1loop:
+    LDA $4016
+    LSR A           ; Logical shift right - all bits in A are shifted to the right, bit7 is 0 and whatever is in bit0 goes to Carry flag
+    ROL controller1    ; Rotate left - opposite of LSR
+    ;; used as a smart way to read controller inputs, as when each button is read, the button data is in bit0, and doing LSR puts the button 
+    ;; in the Carry. Then ROL shifts the previous button data over and puts the carry back into bit0
+    DEX 
+    BNE readcontroller1loop
+    RTS 
+
+moveUp:
+    dec playerYpos
+    ldy playerYpos
+    ldx playerXpos
+    jsr check_background_collision
+    beq @done
+    inc playerYpos
+@done:
+    rts
+
+moveDown:
+    inc playerYpos
+    ldy playerYpos
+    ldx playerXpos
+    jsr check_background_collision
+    beq @done
+    DEC playerYpos
+@done:
+    rts
+
+moveRight:
+    inc playerXpos
+    ldy playerYpos
+    ldx playerXpos
+    jsr check_background_collision
+    beq @done
+    dec playerXpos
+@done:
+    jsr checkLoadingZone
+    rts
+
+moveLeft:
+    dec playerXpos
+    ldy playerYpos
+    ldx playerXpos
+    jsr check_background_collision
+    beq @done
+    inc playerXpos
+@done:
+    jsr checkLoadingZone
+    rts
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;     Checks if player is making a collision with a background tile using the background tile collision map
+;;;   
+;;;     Formula for looking up if background tile has collisions on: ( X / 64 ) + (( Y / 8 ) * 4 ) =  offset
+;;                                      X: player x pos      Y: player y pos
+;;
+check_background_collision:
+    TXA         ; load player x position into A
+    lsr         ; divide by 64 -> lsr 6 times
+    lsr         ; / 4
+    lsr         ; / 8
+    lsr         ; / 16
+    lsr         ; / 32
+    lsr         ; / 64 
+    sta temp    ; store into temp variable
+
+    tya         ; load player y position into A
+    lsr         ; divide by 8 -> lsr 3 times
+    lsr         ; / 4
+    lsr         ; / 8
+    asl         ; multiply by 4 -> asl 2 times
+    asl         ; * 4
+
+    clc         ; clear carry for adding values together
+    adc temp    ; adding to ( X / 64 )
+    tay         ; store value in Y
+
+    TXA
+    lsr
+    lsr
+    lsr
+    and #%0111
+    Tax
+
+    lda hitTable1, y
+    and bitMask, x      ; beq means not collide         bne means collide
+
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Checks if the player has enterered a loadingzone
+;; uses the roomIndex to get the LoadZone
+;; loadzone table structure: 
+;;                  1st byte is the count
+;;                  2nd byte is x pos
+;;                  3rd byte is y pos
+checkLoadingZone:
+    ldx roomIndex           ; uses roomIndex for set pointer to the array of
+    lda LoadZoneLo, X       ;   loading zones for the room we are in
+    sta pointerLo
+    lda LoadZoneHi, X
+    sta pointerHi
+    ldy #$00                ; y is used as our offset to go through the loop
+    lda (pointerLo), y
+    tax                     ; first value in loadingzone table is the counter
+    iny                     ; store the counter in x
+checkLoadingLoop:
+    lda (pointerLo), y
+    cmp playerXpos          ; compare x pos of player with x pos of loading zone
+    bne @bottomOfLoopNoYCheck
+    iny                     ; increment offset
+    lda (pointerLo), y      
+    cmp playerYpos          ; compare y pos of player with y pos of loading zone
+    beq loadingZoneFound    ; both x and y pos must be equal so player is in loading zone
+    bne @bottomOfLoop
+@bottomOfLoopNoYCheck:
+    iny
+@bottomOfLoop:
+    iny                     ; increment y if for next loop iteration if there are multiple possible loading zones in this map
+    iny
+    dex                     
+    cpx #$00
+    BNE checkLoadingLoop
+    rts                     ; loop ended no loading zones found
+
+loadingZoneFound:
+    iny                     ; inc y
+    lda (pointerLo), y
+    sta roomIndex
+    jsr loadbackground
     rts
 
 RESET:
@@ -174,12 +339,16 @@ clearnametables:
 
 
 loadsprites:
+    lda #$80            ; setting starting player position
+    sta playerXpos
+    sta playerYpos
+
     LDX #$00
 loadspritesloop:
     LDA sprites,X
     STA $0200,X
     INX 
-    CPX #$10
+    CPX #$04
     BNE loadspritesloop 
 
     jsr loadbackground
@@ -191,7 +360,7 @@ loadspritesloop:
     CLI 
     LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
     STA PPU_CTRL_REG1
-    LDA #%00001110  ; background and sprites enable, no left clipping
+    LDA #%00011110  ; background and sprites enable, no left clipping
     STA PPU_CTRL_REG2
 
     LDA #$00    ; reset scroll address 
@@ -201,10 +370,59 @@ loadspritesloop:
 forever:
     jmp forever
 
+
+
 ;;;;;; vblank loop - called every frame ;;;;;
 VBLANK:
 
+    lda #$00
+    sta PPU_SPR_ADDR
+    lda #$02
+    sta SPR_DMA
+
+    jsr readcontroller1
+    lda controller1
+    and #%00001000      ; checking if up is pressed
+    beq upNotPressed
+    jsr moveUp
+upNotPressed:
+    lda controller1
+    and #%00000100      ; checking if down is pressed
+    beq downNotPressed
+    jsr moveDown
+downNotPressed:
+    lda controller1
+    and #%00000010
+    beq leftNotPressed
+    jsr moveLeft
+leftNotPressed:
+    lda controller1
+    and #%00000001
+    beq rightNotPressed
+    jsr moveRight
+rightNotPressed:
+    lda playerXpos
+    sta $0203
+    lda playerYpos
+    sta $0200
+
     RTI
+
+RoomTableLo:
+    .byte <background1, <background2
+RoomTableHi:
+    .byte >background1, >background2
+
+LoadZoneLo:
+    .byte <Room1LoadZones, <Room2LoadZones
+LoadZoneHi:
+    .byte >Room1LoadZones, >Room2LoadZones
+
+
+Room1LoadZones:
+    .byte $02, $9F, $80, $01, $5C, $80, $01
+Room2LoadZones:
+    .byte $01, $5C, $80, $00
 
 palette:
     .byte $22, $29, $1a, $0F, $22, $36, $17, $0F, $22, $30, $21, $0F, $0f, $0f, $0f, $0F  ; background palette data
@@ -220,8 +438,7 @@ attributes:  ;8 x 8 = 64 bytes
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
 
-background:
-
+background1:
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
 
@@ -315,15 +532,102 @@ background:
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
 
+background2:
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00   ; row1
+    .byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 2
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 3
+    .byte $24,$24,$24,$24,$24,$24,$00,$00,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 4
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 5
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 6
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 7
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 7
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 8
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 9
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 10
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 11
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 12
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 13
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 14
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 15
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 16
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 17
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 18
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 19
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 20
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 21
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 22
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 23
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 26
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24   ; row 27
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00   ; row 30
+    .byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
+
 sprites:
-    .byte $00, $00, $00, $08 ; YCoord, tile number, attr, XCoord
-    .byte $00, $01, $00, $10
-    .byte $08, $02, $00, $08
-    .byte $08, $03, $00, $10
-    .byte $10, $04, $00, $08
-    .byte $10, $05, $00, $10
-    .byte $18, $06, $00, $08
-    .byte $18, $07, $00, $10
+    .byte $80, $00, $00, $80 ; YCoord, tile number, attr, XCoord
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -331,7 +635,7 @@ sprites:
 ;;      - each bit represent the tile in that location
 ;;      - 0: collision off      1: collision on
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-hitTable:
+hitTable1:
     .byte %00000000, %00000000, %00000000, %00000000
     .byte %00000000, %00000000, %00000000, %00000000
     .byte %00001111, %11111111, %11111111, %11110000
@@ -370,6 +674,55 @@ hitTable:
     .byte %00000000, %00000000, %00000000, %00000000
     .byte %00000000, %00000000, %00000000, %00000000
 
+hitTable2:
+    .byte %00000000, %00000000, %00000000, %00000000
+    .byte %00000000, %00000000, %00000000, %00000000
+    .byte %00001111, %11111111, %11111111, %11110000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000011, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00001111, %11111111, %11111111, %11110000
+
+    .byte %00000000, %00000000, %00000000, %00000000
+    .byte %00000000, %00000000, %00000000, %00000000
+
+
+bitMask:
+    .byte %10000000
+    .byte %01000000
+    .byte %00100000
+    .byte %00010000
+    .byte %00001000
+    .byte %00000100
+    .byte %00000010
+    .byte %00000001
 
 .segment "VECTORS"
     .word VBLANK
