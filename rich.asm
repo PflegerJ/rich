@@ -25,7 +25,8 @@
     playerYpos:     .res 1
     nameTable:      .res 1  ; which nametable to load
     roomIndex:      .res 1
-    temp:           .res 1
+    temp1:           .res 1
+    temp2:          .res 1
     ;; Constants
 
     PPU_CTRL_REG1         = $2000
@@ -158,7 +159,10 @@ readcontroller1loop:
 
 moveUp:
     dec playerYpos
-    ldy playerYpos
+    lda playerYpos
+    clc
+    adc #$01
+    tay
     ldx playerXpos
     jsr check_background_collision
     beq @done
@@ -176,14 +180,35 @@ moveDown:
 @done:
     rts
 
+;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
 moveRight:
     inc playerXpos
-    ldy playerYpos
-    ldx playerXpos
+    lda playerXpos
+    clc
+    adc #07
+    tax 
+    lda playerYpos
+    clc
+    adc #$01
+    tay
     jsr check_background_collision
-    beq @done
+    beq @checkBottomPixel
     dec playerXpos
-@done:
+
+@checkBottomPixel:
+    lda playerXpos
+    clc
+    adc #$07
+    tax
+    lda playerYpos
+    clc
+    adc #$08
+    tay
+    jsr check_background_collision
+    beq @noCollision
+    dec playerXpos
+    
+@noCollision:
     jsr checkLoadingZone
     rts
 
@@ -215,7 +240,7 @@ check_background_collision:
     lsr         ; / 16
     lsr         ; / 32
     lsr         ; / 64 
-    sta temp    ; store into temp variable
+    sta temp1    ; store into temp variable
 
     tya         ; load player y position into A
     lsr         ; divide by 8 -> lsr 3 times
@@ -225,7 +250,7 @@ check_background_collision:
     asl         ; * 4
 
     clc         ; clear carry for adding values together
-    adc temp    ; adding to ( X / 64 )
+    adc temp1    ; adding to ( X / 64 )
     tay         ; store value in Y
 
     TXA
@@ -253,17 +278,26 @@ checkLoadingZone:
     sta pointerLo
     lda LoadZoneHi, X
     sta pointerHi
+
+    lda playerXpos
+    and #%11111000
+    sta temp1
+    lda playerYpos
+    and #%11111000
+    sta temp2
     ldy #$00                ; y is used as our offset to go through the loop
     lda (pointerLo), y
     tax                     ; first value in loadingzone table is the counter
     iny                     ; store the counter in x
 checkLoadingLoop:
+
+
     lda (pointerLo), y
-    cmp playerXpos          ; compare x pos of player with x pos of loading zone
+    cmp temp1          ; compare x pos of player with x pos of loading zone
     bne @bottomOfLoopNoYCheck
     iny                     ; increment offset
     lda (pointerLo), y      
-    cmp playerYpos          ; compare y pos of player with y pos of loading zone
+    cmp temp2          ; compare y pos of player with y pos of loading zone
     beq loadingZoneFound    ; both x and y pos must be equal so player is in loading zone
     bne @bottomOfLoop
 @bottomOfLoopNoYCheck:
@@ -353,9 +387,6 @@ loadspritesloop:
 
     jsr loadbackground
 
-    jsr loadattribute
-
-
 
     CLI 
     LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
@@ -420,9 +451,9 @@ LoadZoneHi:
 
 
 Room1LoadZones:
-    .byte $02, $9F, $80, $01, $5C, $80, $01
+    .byte $04,  $20, $40, $01,   $20, $48, $01,  $20, $50, $01,  $20, $58, $01
 Room2LoadZones:
-    .byte $01, $5C, $80, $00
+    .byte $01, $80, $80, $00
 
 palette:
     .byte $22, $29, $1a, $0F, $22, $36, $17, $0F, $22, $30, $21, $0F, $0f, $0f, $0f, $0F  ; background palette data
@@ -431,7 +462,7 @@ palette:
 attributes:  ;8 x 8 = 64 bytes
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
-  .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
+  .byte %00000000, %11111111, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
   .byte %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
@@ -646,10 +677,10 @@ hitTable1:
     .byte %00001000, %00000000, %00000000, %00010000
     .byte %00001000, %00000000, %00000000, %00010000
 
-    .byte %00001000, %00000000, %00000000, %00010000
-    .byte %00001000, %00000000, %00000000, %00010000
-    .byte %00001000, %00000000, %00000000, %00010000
-    .byte %00001000, %00000000, %00000000, %00010000
+    .byte %00010000, %00000000, %00000000, %00010000
+    .byte %00010000, %00000000, %00000000, %00010000
+    .byte %00010000, %00000000, %00000000, %00010000
+    .byte %00010000, %00000000, %00000000, %00010000
 
     .byte %00001000, %00000000, %00000000, %00010000
     .byte %00001000, %00000000, %00000000, %00010000
