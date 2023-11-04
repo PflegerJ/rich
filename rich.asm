@@ -622,8 +622,9 @@ BathroomLoadZone:
     .byte $A0, $78, $01, $B3, $30
     .byte $A8, $78, $01, $B3, $30
 BalconyLoadZone:
-    .byte $00
-
+    .byte $02
+    .byte $FF, $FF, $00, $FF, $FF
+    .byte $FF, $FF, $00, $FF, $FF
 Outside1LoadZone:
     .byte $00
 
