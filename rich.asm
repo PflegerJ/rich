@@ -26,6 +26,7 @@
     nameTable:      .res 1  ; which nametable to load
     roomIndex:      .res 1
     spriteCount:    .res 1
+    gameTimeSeconds: .res 1
     temp1:          .res 1
     temp2:          .res 1
     ;; Constants
@@ -48,6 +49,15 @@
     playerXpos            = $0207       ; sprite 1 x pos
     playerYpos            = $0204       ; sprite 1 y pos
 
+    timerSpriteYpos       = $0208
+    timerSpriteTile       = $0209
+    timerSpriteAtt        = $020A  
+    timerSpriteXpos       = $020B
+
+    timerSpriteTensYpos     = $020C
+    timerSpriteTensTile     = $020D
+    timerSpriteTensAtt      = $020E
+    timerSpriteTensXpos     = $020F
 
 .segment "CODE"
 
@@ -66,7 +76,7 @@ spriteLoop:
     lda sprites, X
     sta SPRITE_RAM, X
     inx
-    cpx #$08
+    cpx #$10
     bne spriteLoop
     rts
 
@@ -429,6 +439,44 @@ loadingZoneFound:
 
     jsr loadbackground
     rts
+
+Timer:
+    ;; increase time value each frame
+    lda gameTimeSeconds         ; keeps track of how many frames have passed
+    clc                         ; increment each frame
+    adc #$01
+    cmp #$3C                    ; compare with 60 
+    beq IncreaseTime            ; 60 frames have passed
+    sta gameTimeSeconds         ; 60 frames have not passed. exit subroutine
+    rts
+ 
+IncreaseTime:                   ; 60 frames have passed. need to increment seconds
+    lda #$00                
+    sta gameTimeSeconds         ; first storing 0 to reset 60 frame counter
+    lda timerSpriteTile         ; increment the tile
+    clc
+    adc #$01
+    cmp #$0A                    ; compare with 10
+    bne LessThan10              ; value less than 10 no need to increment 10s place
+    lda timerSpriteTensTile     ; incrementing 10s place 
+    clc
+    adc #$01
+    cmp #$06                    ; compare with 6 to see if a minute has passed
+    bne LessThan6               ; branch if minute has not passed
+    lda #$00                    ; storing 0 in both 10s and 1s place since a full minute has passed
+    sta timerSpriteTensTile
+    sta timerSpriteTile
+    rts
+
+LessThan10:                     ; 1s place has not rolled over. simply store value and move on
+    sta timerSpriteTile
+    rts
+
+LessThan6:                      ; 1s place as rolled over, 10s place has not
+    sta timerSpriteTensTile     ; store incremented 10s place
+    lda #$00                    
+    sta timerSpriteTile         ; store 0 in 1s place 
+    rts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -510,7 +558,7 @@ forever:
 VBLANK:
 
     jsr updateSprites
-
+    jsr Timer
     jsr readcontroller1
 
     lda controller1
@@ -1021,7 +1069,8 @@ StoreBackground:        ; roomIndex: 5
 sprites: ;  y  tile  att  x
     .byte $FE, $fe, $fe, $fe    ; 0 sprite off the screen (maybe status bar or something)
     .byte $80, $00, $00, $80 ; YCoord, tile number, attr, XCoord
-
+    .byte $10, $00, $00, $10        ; 1's digit of timer sprite
+    .byte $10, $00, $00, $08
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
