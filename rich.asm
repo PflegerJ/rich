@@ -606,11 +606,11 @@ LivingRoomLoadZone:
     .byte $B0, $28, $03, $A3, $68 ; bathroom
     .byte $B8, $28, $03, $A3, $68
 
-    .byte $30, $B8, $04, $80, $80 ; balcony
-    .byte $30, $B0, $04, $80, $80
+    .byte $30, $B8, $04, $C0, $84 ; balcony
+    .byte $30, $B0, $04, $C0, $84
 
-    .byte $78, $28, $06, $80, $80 ; outside 1
-    .byte $70, $28, $06, $80, $80
+    .byte $78, $28, $04, $C0, $50 ; balcony lower
+    .byte $70, $28, $04, $C0, $50
 
 ScottRoomLoadZone:
     .byte $02
@@ -623,8 +623,8 @@ BathroomLoadZone:
     .byte $A8, $78, $01, $B3, $30
 BalconyLoadZone:
     .byte $02
-    .byte $FF, $FF, $00, $FF, $FF
-    .byte $FF, $FF, $00, $FF, $FF
+    .byte $D0, $80, $01, $38, $B4
+    .byte $D0, $88, $01, $38, $B4
 Outside1LoadZone:
     .byte $00
 

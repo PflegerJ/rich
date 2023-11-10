@@ -1,6 +1,6 @@
 version	major=2,minor=0
 info	csym=0,file=2,lib=0,line=1080,mod=1,scope=1,seg=10,span=973,sym=118,type=9
-file	id=0,name="rich.asm",size=76160,mtime=0x6546D603,mod=0
+file	id=0,name="rich.asm",size=76164,mtime=0x654D472A,mod=0
 file	id=1,name="mario.chr",size=8192,mtime=0x44D7E118,mod=0
 line	id=0,file=0,line=1235,span=904
 line	id=1,file=0,line=716,span=448
