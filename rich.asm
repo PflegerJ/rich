@@ -26,7 +26,9 @@
     nameTable:      .res 1  ; which nametable to load
     roomIndex:      .res 1
     spriteCount:    .res 1
-    gameTimeSeconds: .res 1
+    frameCounter60: .res 1
+    gameTime:       .res 2
+    fifteenSeconds:      .res 1
     temp1:          .res 1
     temp2:          .res 1
     ;; Constants
@@ -59,6 +61,15 @@
     timerSpriteTensAtt      = $020E
     timerSpriteTensXpos     = $020F
 
+    timer2Ypos              = $0210
+    timer2Tile              = $0211
+    timer2Att               = $0212
+    timer2Xpos              = $0213
+
+    timer2TensYpos          = $0214
+    timer2TensTile          = $0215
+    timer2TensAtt           = $0216
+    timer2TensXpos          = $0217
 .segment "CODE"
 
     ;; Subroutines
@@ -76,7 +87,7 @@ spriteLoop:
     lda sprites, X
     sta SPRITE_RAM, X
     inx
-    cpx #$10
+    cpx #$30
     bne spriteLoop
     rts
 
@@ -442,17 +453,17 @@ loadingZoneFound:
 
 Timer:
     ;; increase time value each frame
-    lda gameTimeSeconds         ; keeps track of how many frames have passed
+    lda frameCounter60         ; keeps track of how many frames have passed
     clc                         ; increment each frame
     adc #$01
     cmp #$3C                    ; compare with 60 
     beq IncreaseTime            ; 60 frames have passed
-    sta gameTimeSeconds         ; 60 frames have not passed. exit subroutine
+    sta frameCounter60         ; 60 frames have not passed. exit subroutine
     rts
  
 IncreaseTime:                   ; 60 frames have passed. need to increment seconds
     lda #$00                
-    sta gameTimeSeconds         ; first storing 0 to reset 60 frame counter
+    sta frameCounter60         ; first storing 0 to reset 60 frame counter
     lda timerSpriteTile         ; increment the tile
     clc
     adc #$01
@@ -477,6 +488,78 @@ LessThan6:                      ; 1s place as rolled over, 10s place has not
     lda #$00                    
     sta timerSpriteTile         ; store 0 in 1s place 
     rts
+
+Timer2:
+    lda frameCounter60         ; keeps track of how many frames have passed
+    clc                         ; increment each frame
+    adc #$01
+    cmp #$3C                    ; compare with 60 
+    beq @IncrementTime
+    sta frameCounter60
+    rts
+
+@IncrementTime:
+    lda #$00
+    sta frameCounter60
+    lda gameTime+0
+    clc
+    adc #$01
+    cmp #$00            ; check if rolling over to increment byte 2 of timer variable
+    bne @NoRollover
+    lda gameTime+1
+    clc
+    adc #$01
+    sta gameTime+1
+    lda #$00
+    
+@NoRollover:
+    sta gameTime+0
+    and #%00000011
+    cmp #$00
+    bne @Done
+    lda fifteenSeconds
+    clc
+    adc #$01
+    cmp #$04
+    beq @SetItToZero
+    cmp #$01
+    beq @Setting15
+    cmp #$02
+    beq @Setting30
+    sta fifteenSeconds
+    lda #$05
+    sta timer2Tile
+    lda #$04
+    sta timer2TensTile
+    jmp @Done
+
+@Setting15:
+    sta fifteenSeconds
+    lda #$05
+    sta timer2Tile
+    lda #$01
+    sta timer2TensTile
+    jmp @Done
+
+@Setting30:
+    sta fifteenSeconds
+    lda #$00
+    sta timer2Tile
+    lda #$03
+    sta timer2TensTile
+    jmp @Done
+
+@SetItToZero:
+    lda #$00
+    sta fifteenSeconds
+    lda #$00
+    sta timer2Tile
+    sta timer2TensTile
+
+@Done:
+    rts
+     
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -558,7 +641,8 @@ forever:
 VBLANK:
 
     jsr updateSprites
-    jsr Timer
+    ;jsr Timer
+    jsr Timer2
     jsr readcontroller1
 
     lda controller1
@@ -1070,7 +1154,9 @@ sprites: ;  y  tile  att  x
     .byte $FE, $fe, $fe, $fe    ; 0 sprite off the screen (maybe status bar or something)
     .byte $80, $00, $00, $80 ; YCoord, tile number, attr, XCoord
     .byte $10, $00, $00, $10        ; 1's digit of timer sprite
-    .byte $10, $00, $00, $08
+    .byte $10, $00, $00, $08        ; 10s digit of timer sprite
+    .byte $20, $00, $00, $10        ; 1s digit of timer2
+    .byte $20, $00, $00, $08        ; 10s digit of timer 2
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

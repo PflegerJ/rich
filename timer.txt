@@ -1,0 +1,29 @@
+I have a couple ideas of how to implement a timer
+
+The first method is rather crude, but i'm not sure thats a bad thing.
+The time is stored as the tile value for each sprite. This saves space because im reusing
+memory. It also could save clock cycles from having to do derive the time from a variable, then set the
+sprites to have the correct tile for each digit.
+I have a frame counter. every 60 frames I increment the 1s place tile. if that rolls over to 10, 
+then i reset it and increment the 10s digit tile.
+
+The main issues I can forsee with this is actually using the time for ingame events/mechanics
+I would have to compare the correct digit tile values to determine what time it is in game. So if an event
+is supposed to be triggered at a specific time, I would have to compare each digit potentially instead of 
+just checking if the ingame time is within a range if it was just a variable instead of tile value.
+
+
+
+Another way i could do the timer, is have a variable (not sure the size) that holds the time. and display that time
+using math to get each digit. I'm not sure if there is a quick or smart way to do that math. i'm trying to avoid dividing
+as much as possible unless its by 2.
+
+If i just have a time variable. Idk if it could count each frame. I could have the same frame counter set up where it only
+increments every X frames. but say i have a timer. 50 seconds have passed. 
+
+wait. what if in game time only shows like 15 min increments? so X frames means like 15 min. then 30 min. If its a x^2 amount of 60 frames
+then i could just and with like 8. and then compare
+
+ok. So with this new timer implementation, I can store up to 18 hours of gameplay till the timer rolls over back to 0 with a 2 byte variable.
+I am also able to change the rate of which the in game time displays based off what I AND the timer with. that makes it so I can change how
+fast i want the game to go very easily. 
