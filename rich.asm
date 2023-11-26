@@ -29,6 +29,9 @@
     frameCounter60: .res 1
     gameTime:       .res 2
     fifteenSeconds:      .res 1
+    score:          .res 1
+    scoreIncrementOnes: .res 1
+    scoreIncrementTens: .res 1
     temp1:          .res 1
     temp2:          .res 1
     ;; Constants
@@ -70,6 +73,32 @@
     timer2TensTile          = $0215
     timer2TensAtt           = $0216
     timer2TensXpos          = $0217
+
+    score1sYpos             = $0218
+    score1sTile             = $0219
+    score1sAtt              = $021A
+    score1sXpos             = $021B
+
+    score10sYpos            = $021C
+    score10sTile            = $021D
+    score10sAtt             = $021E
+    score10sXpos            = $021F
+
+    score100sYpos           = $0220
+    score100sTile           = $0221
+    score100sAtt            = $0222
+    score100sXpos           = $0223
+
+    score1000sYpos          = $0224
+    score1000sTile          = $0225
+    score1000sAtt           = $0226
+    score1000sXpos          = $0227
+
+    score10000sYpos         = $0228
+    score10000sTile         = $0229
+    score10000sAtt          = $022A
+    score10000sXpos         = $022B
+
 .segment "CODE"
 
     ;; Subroutines
@@ -87,7 +116,7 @@ spriteLoop:
     lda sprites, X
     sta SPRITE_RAM, X
     inx
-    cpx #$30
+    cpx #$2D
     bne spriteLoop
     rts
 
@@ -279,6 +308,11 @@ moveDown:
 
 ;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
 moveRight:
+    lda #$01
+    sta scoreIncrementOnes
+    lda #$00
+    sta scoreIncrementTens
+    jsr IncrementScore
     inc playerXpos
     lda playerXpos
     clc
@@ -310,6 +344,11 @@ moveRight:
     rts
 
 moveLeft:
+    lda #$05
+    sta scoreIncrementOnes
+    lda #$05
+    sta scoreIncrementTens
+    jsr IncrementScore
     dec playerXpos
     ldx playerXpos
     lda playerYpos
@@ -562,6 +601,96 @@ Timer2:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; increases the score
+;   Must set scoreIncrementOnes and scoreIncrementTens variable before calling subroutine.
+;   Each digit is stored in a sprite tile byte.
+;       Clock Cycles    used:
+;       memory          used:
+;       registers       used: A
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+IncrementScore:
+    lda score1sTile             ; load 1s digit tile
+    clc
+    adc scoreIncrementOnes      ; add 1s digit score increment to 1s digit tile
+    cmp #$0A                    ; checking for rollover
+    bcs @Rollover1s             ; branch on carry set (carry set if score1sTile is >= $0A)
+    sta score1sTile             ; no rollover, store and move on
+    jmp @IncrementScore10s
+
+@Rollover1s:                    ; 1st digit roll over
+    sec
+    sbc #$0A                    ; subtract 10 to isolate 1s digit
+    sta score1sTile             ; store new value in 1s digit
+    lda scoreIncrementTens      ; increase the amount adding to 10s digit by 1
+    clc
+    adc #$01
+    sta scoreIncrementTens      ; probably a better way to do this than loading variable, incrementing to then store and then use like 5 lines later
+
+@IncrementScore10s:             ; adding to 10s digit
+    lda score10sTile
+    clc
+    adc scoreIncrementTens
+    cmp #$0A                    ; checking for rollover
+    bcs @Rollover10s
+    sta score10sTile
+    rts
+
+@Rollover10s:                   ; 10s digit rollover, increment 100s digit by 1
+    sec                         ; first store 10s digit subtracted by 10
+    sbc #$0A            
+    sta score10sTile
+
+    lda score100sTile           ; increment 100s digit by 1
+    clc
+    adc #$01
+    cmp #$0A                    ; check for rollover
+    beq @Rollover100s
+    sta score100sTile
+    rts
+
+@Rollover100s:                  ; 100s digit rollover, increment 1000s digit by 1
+    lda #$00
+    sta score100sTile
+    lda score1000sTile
+    clc
+    adc #$01
+    cmp #$0A
+    beq @Rollover1000s
+    sta score1000sTile
+    rts
+
+@Rollover1000s:                 ; 1000s digit rollover, increment 10000s digit by 1. no further rollover checks
+    lda #$00
+    sta score1000sTile
+    lda score10000sTile
+    clc
+    adc #$01
+    sta score10000sTile
+    rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Proximity check
+;   checks player proximity to certain objects
+;   hoping its based off roomID?
+;   how can i use pointers to call subroutines...
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Proximity:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Distance formula
+;  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Distance:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
     sei			; disable IRQs
 	cld			; disable decimal mode
@@ -645,6 +774,8 @@ VBLANK:
     jsr Timer2
     jsr readcontroller1
 
+    ldx #$02
+    ;jsr IncrementScore
     lda controller1
     and #%00001000      ; checking if up is pressed
     beq upNotPressed
@@ -712,6 +843,9 @@ StartingPosLo:
 StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
+RoomBasedEvents:
+    .byte <Proximity
+    .byte >Proximity
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1158,6 +1292,11 @@ sprites: ;  y  tile  att  x
     .byte $20, $00, $00, $10        ; 1s digit of timer2
     .byte $20, $00, $00, $08        ; 10s digit of timer 2
 
+    .byte $20, $00, $00, $80        ; score 1s
+    .byte $20, $00, $00, $78        ; score 10s
+    .byte $20, $00, $00, $70        ; score 100s
+    .byte $20, $00, $00, $68        ; score 1000s
+    .byte $20, $00, $00, $60        ; score 10000s
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   
