@@ -249,6 +249,11 @@ setPlayerStartingPos:
     rts
 
 moveUp:
+    lda #$03
+    sta scoreIncrementOnes
+    lda #$00
+    sta scoreIncrementTens
+    jsr DecrementScore
     dec playerYpos
     lda playerYpos
     clc
@@ -278,6 +283,11 @@ moveUp:
     rts
 
 moveDown:
+    lda #$06
+    sta scoreIncrementOnes
+    lda #$00
+    sta scoreIncrementTens
+    jsr IncrementScore
     inc playerYpos
     lda playerYpos
     clc
@@ -310,7 +320,7 @@ moveDown:
 moveRight:
     lda #$01
     sta scoreIncrementOnes
-    lda #$00
+    lda #$01
     sta scoreIncrementTens
     jsr IncrementScore
     inc playerXpos
@@ -344,11 +354,11 @@ moveRight:
     rts
 
 moveLeft:
-    lda #$05
+    lda #$01
     sta scoreIncrementOnes
-    lda #$05
+    lda #$07
     sta scoreIncrementTens
-    jsr IncrementScore
+    jsr DecrementScore
     dec playerXpos
     ldx playerXpos
     lda playerYpos
@@ -670,6 +680,72 @@ IncrementScore:
     sta score10000sTile
     rts
 
+
+DecrementScore:
+    lda score1sTile
+    cmp scoreIncrementOnes
+    bcc @TakeFrom10s                            ; branch if score value is less than decrement value for rollover math 
+    sec 
+    sbc scoreIncrementOnes
+    sta score1sTile
+    jmp @SubTensPlace
+
+@TakeFrom10s:
+    clc 
+    adc #$0A
+    sec 
+    sbc scoreIncrementOnes
+    sta score1sTile
+
+    lda scoreIncrementTens
+    clc 
+    adc #$01
+    sta scoreIncrementTens
+
+
+@SubTensPlace: 
+    lda score10sTile
+    cmp scoreIncrementTens
+    bcc @TakeFrom100s
+    sec 
+    sbc scoreIncrementTens
+    sta score10sTile
+    rts 
+
+@TakeFrom100s:
+    lda score10sTile
+    clc 
+    adc #$0A
+    sec 
+    sbc scoreIncrementTens
+    sta score10sTile
+    lda score100sTile
+    cmp #$00
+    beq @TakeFrom1000s
+    sec 
+    sbc #$01
+    sta score100sTile
+    rts 
+
+@TakeFrom1000s:
+    lda #$09
+    sta score100sTile
+    lda score1000sTile
+    cmp #$00
+    beq @TakeFrom10000s
+    sec 
+    sbc #$01
+    sta score1000sTile
+    rts 
+
+@TakeFrom10000s:
+    lda #$09
+    sta score1000sTile
+    lda score10000sTile
+    sec 
+    sbc #$01
+    sta score10000sTile
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -775,7 +851,7 @@ VBLANK:
     jsr readcontroller1
 
     ldx #$02
-    ;jsr IncrementScore
+
     lda controller1
     and #%00001000      ; checking if up is pressed
     beq upNotPressed

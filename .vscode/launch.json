@@ -10,7 +10,7 @@
             "name": "Debug rom with mesen",
             "romPath": "${workspaceFolder}/rich.nes",
             "dbgPath": "${workspaceFolder}/rich.dbg",
-            "program": "C:\\Users\\James\\nes\\mesen/mesen.exe",
+            "program": "C:\\Users\\James\\nes\\mesen.exe",
             "sourcePath": "${workspaceFolder}/",
             "stopOnEntry": true,
             "resetOnEntry": true
