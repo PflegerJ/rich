@@ -34,6 +34,8 @@
     scoreIncrementTens: .res 1
     temp1:          .res 1
     temp2:          .res 1
+    distanceTestValueX:       .res 1
+    distanceTestValueY:       .res 1
     ;; Constants
 
     PPU_CTRL_REG1         = $2000
@@ -99,6 +101,11 @@
     score10000sAtt          = $022A
     score10000sXpos         = $022B
 
+    distanceTestYpos        = $022C
+    distanceTestTile        = $022D
+    distanceTestAtt         = $022E
+    distanceTestXpos        = $022F
+
 .segment "CODE"
 
     ;; Subroutines
@@ -116,7 +123,7 @@ spriteLoop:
     lda sprites, X
     sta SPRITE_RAM, X
     inx
-    cpx #$2D
+    cpx #$30
     bne spriteLoop
     rts
 
@@ -759,11 +766,52 @@ Proximity:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Distance formula
-;  
+; Distance formulas
+; 
+; Distance1: 
+;       Using a^2 + b^2 to find relative distance between player position and distanceTest sprites pos
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Distance:
+Distance1:
+    ; first find a^2
+    lda playerXpos
+    cmp distanceTestXpos
+    bcc @DistanceXBigger ; branch if distanceTestX is bigger
+    sec 
+    sbc distanceTestXpos
+    sta distanceTestValueX
+    jmp @CalcYDiff
+
+@DistanceXBigger:
+    lda distanceTestXpos
+    sec 
+    sbc playerXpos
+    sta distanceTestValueX
+
+@CalcYDiff:
+    lda playerYpos
+    cmp distanceTestYpos
+    bcc @DistanceYBigger ; brance if distanceTestY is bigger
+    sec 
+    sbc distanceTestYpos
+    sta distanceTestValueY
+    jmp @Squaring
+
+@DistanceYBigger:
+    lda distanceTestYpos
+    sec 
+    sbc playerYpos
+    sta distanceTestValueY
+
+@Squaring:
+    rts
+
+
+; assume the smaller number is used for the loop in register x
+; assume the larger number will be loaded in to A and then added together x times
+; assume both numbers will be 0 - FF so largest value cannot exceed 2 bytes of storage
+Multiply:
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -877,6 +925,7 @@ rightNotPressed:
    ; lda playerYpos
    ; sta $0200
 
+    jsr Distance1
     RTI
 
 
@@ -1373,6 +1422,8 @@ sprites: ;  y  tile  att  x
     .byte $20, $00, $00, $70        ; score 100s
     .byte $20, $00, $00, $68        ; score 1000s
     .byte $20, $00, $00, $60        ; score 10000s
+
+    .byte $80, $01, $00, $80        ; sprite pos for distance testing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   
