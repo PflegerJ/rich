@@ -19,7 +19,6 @@
     ;; Variables
     pointerLo:      .res 1  ; pointer variables are declared in RAM
     pointerHi:      .res 1  ; low byte first, high byte immediately after
-    blANK:          .res 8
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
    ; playerXpos:     .res 1  
    ; playerYpos:     .res 1
@@ -36,6 +35,7 @@
     temp2:          .res 1
     distanceTestValueX:       .res 1
     distanceTestValueY:       .res 1
+    distanceTestResult:       .res 2
     ;; Constants
 
     PPU_CTRL_REG1         = $2000
@@ -804,14 +804,81 @@ Distance1:
     sta distanceTestValueY
 
 @Squaring:
-    rts
+    lda distanceTestValueX
+    sta temp1
+    sta temp2
+    jsr DumbMultiply
+
+    lda temp1
+    sta distanceTestResult
+    lda temp2
+    sta distanceTestResult + 1
+
+    lda distanceTestValueY
+    sta temp1
+    sta temp2
+    jsr DumbMultiply
+
+    lda distanceTestResult
+    clc 
+    adc temp1
+    sta distanceTestResult
+
+    lda distanceTestResult + 1
+    adc temp2
+    sta distanceTestResult + 1
+    
+    rts 
 
 
-; assume the smaller number is used for the loop in register x
-; assume the larger number will be loaded in to A and then added together x times
+
 ; assume both numbers will be 0 - FF so largest value cannot exceed 2 bytes of storage
-Multiply:
+; assume both values are in temp1 and temp2 idk the best way to do this and im getting paralyzed with indecision so im yoloing it
+; store 2nd byte in temp1?
+DumbMultiply:
+    lda temp2
+    cmp #$00
+    beq @MultiZero
+    lda temp1
+    cmp #$00
+    beq @MultiZero
+    cmp temp2
+    bcc @Temp2Bigger 
+    ; if temp1 is bigger i want to use temp2 as the loop counter and store it X
+    ldx temp2
+    jmp @StartMulti
 
+@Temp2Bigger:
+    lda temp2
+    ldx temp1
+    lda temp1
+
+@StartMulti:
+    ldy #$00
+
+@MultiLoop:
+    cpx #$01
+    beq @MultiDone
+    clc 
+    adc temp1
+    bcs @MultiOverFlow
+    dex 
+    jmp @MultiLoop
+
+@MultiOverFlow:
+    iny
+    dex  
+    jmp @MultiLoop
+
+@MultiZero:
+    lda #$00
+    ldy #$00
+
+@MultiDone:
+    sta temp1       ; low byte of the result
+    sty temp2       ; high byte of the result
+    rts 
+    ; at this point the larger number should be in A. the smaller number should be in temp1 to use as loop counter
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
