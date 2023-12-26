@@ -29,14 +29,17 @@
     gameTime:       .res 2
     fifteenSeconds:      .res 1
     score:          .res 1
-    scoreIncrementOnes: .res 1
-    scoreIncrementTens: .res 1
+    
     temp1:          .res 1
     temp2:          .res 1
+    
+    ;; Constants
+
     distanceTestValueX:       .res 1
     distanceTestValueY:       .res 1
     distanceTestResult:       .res 2
-    ;; Constants
+    scoreIncrementOnes: .res 1
+    scoreIncrementTens: .res 1
 
     PPU_CTRL_REG1         = $2000
     PPU_CTRL_REG2         = $2001
@@ -256,11 +259,6 @@ setPlayerStartingPos:
     rts
 
 moveUp:
-    lda #$03
-    sta scoreIncrementOnes
-    lda #$00
-    sta scoreIncrementTens
-    jsr DecrementScore
     dec playerYpos
     lda playerYpos
     clc
@@ -290,11 +288,6 @@ moveUp:
     rts
 
 moveDown:
-    lda #$06
-    sta scoreIncrementOnes
-    lda #$00
-    sta scoreIncrementTens
-    jsr IncrementScore
     inc playerYpos
     lda playerYpos
     clc
@@ -325,11 +318,6 @@ moveDown:
 
 ;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
 moveRight:
-    lda #$01
-    sta scoreIncrementOnes
-    lda #$01
-    sta scoreIncrementTens
-    jsr IncrementScore
     inc playerXpos
     lda playerXpos
     clc
@@ -361,11 +349,6 @@ moveRight:
     rts
 
 moveLeft:
-    lda #$01
-    sta scoreIncrementOnes
-    lda #$07
-    sta scoreIncrementTens
-    jsr DecrementScore
     dec playerXpos
     ldx playerXpos
     lda playerYpos
@@ -753,6 +736,8 @@ DecrementScore:
     sbc #$01
     sta score10000sTile
     rts 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -763,6 +748,21 @@ DecrementScore:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Proximity:
+    jsr Distance1
+    lda distanceTestResult + 1
+    cmp #$05
+    bcc @FirstRange ; i always forget when the stupid carry flag gets set on cmp
+    rts 
+
+@FirstRange:
+    lda #$00
+    sta scoreIncrementTens
+    lda #$05
+    sta scoreIncrementOnes
+    jsr DecrementScore
+    rts 
+    ; pretend i've calcualted some threshholds
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -775,7 +775,7 @@ Proximity:
 Distance1:
     ; first find a^2
     lda playerXpos
-    cmp distanceTestXpos
+    cmp distanceTestXpos    ; this needs to be changed to scotts sprite? hmmmm
     bcc @DistanceXBigger ; branch if distanceTestX is bigger
     sec 
     sbc distanceTestXpos
@@ -880,6 +880,28 @@ DumbMultiply:
     rts 
     ; at this point the larger number should be in A. the smaller number should be in temp1 to use as loop counter
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;
+;
+;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LivingRoomTestFunction:
+    jsr Proximity
+    rts 
+DoAction:
+    lda roomIndex
+    tax 
+    lda RoomBasedEventsHi,x
+    pha 
+    lda RoomBasedEventsLo,x
+    pha  
+    rts 
+
+DoNothing:
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -992,8 +1014,8 @@ rightNotPressed:
    ; lda playerYpos
    ; sta $0200
 
-    jsr Distance1
-    RTI
+    jsr DoAction
+    RTI 
 
 
 Palette:
@@ -1035,9 +1057,10 @@ StartingPosLo:
 StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
-RoomBasedEvents:
-    .byte <Proximity
-    .byte >Proximity
+RoomBasedEventsLo:
+    .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
+RoomBasedEventsHi:
+    .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -1487,7 +1510,7 @@ sprites: ;  y  tile  att  x
     .byte $20, $00, $00, $80        ; score 1s
     .byte $20, $00, $00, $78        ; score 10s
     .byte $20, $00, $00, $70        ; score 100s
-    .byte $20, $00, $00, $68        ; score 1000s
+    .byte $20, $09, $00, $68        ; score 1000s
     .byte $20, $00, $00, $60        ; score 10000s
 
     .byte $80, $01, $00, $80        ; sprite pos for distance testing
