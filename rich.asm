@@ -32,7 +32,14 @@
     
     temp1:          .res 1
     temp2:          .res 1
+
+    flag1:        .res 1    ; bits: X - X - X - X - X - X - NMI Flag - Lag Frame Flag
     
+    controller1PreviousInput:   .res 1
+    controller1Pressed:         .res 1
+    controller1Held:            .res 1
+
+    playerState:                .res 1
     ;; Constants
 
     distanceTestValueX:       .res 1
@@ -974,16 +981,18 @@ clearnametables:
     STA PPU_SCROLL_REG
     sta PPU_SCROLL_REG
     
-forever:
-    jmp forever
 
+Main:
+    lda flag1
+    and #%00000010          ; isolating nmi flag
+    cmp #$00                ; nmi flag 0: nmi hasn't happened yet keep looping  1: nmi has happened start game logic for next frame
+    beq Main
 
+    lda flag1
+    ora #%00000001          ; set lag frame flag
+    and #%11111101          ; clear the nmi flag
+    sta flag1
 
-;;;;;; vblank loop - called every frame ;;;;;
-VBLANK:
-
-    jsr updateSprites
-    ;jsr Timer
     jsr Timer2
     jsr readcontroller1
 
@@ -1015,6 +1024,19 @@ rightNotPressed:
    ; sta $0200
 
     jsr DoAction
+
+    jmp Main
+
+;;;;;; vblank loop - called every frame ;;;;;
+VBLANK:
+    lda flag1           ; setting nmi flag
+    ora #%00000010  
+    sta flag1
+
+    jsr updateSprites
+    ;jsr Timer
+
+    
     RTI 
 
 
