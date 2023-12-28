@@ -950,6 +950,11 @@ StandingLogic:
     eor #%00000001
     sta playerTile
 
+@ControllerChecking:
+    lda controller1Pressed
+    asl 
+
+
                                   ; standing animation sprite update
 @DoneStanding:        
     rts 
@@ -1153,6 +1158,11 @@ RoomBasedEventsLo:
     .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
 RoomBasedEventsHi:
     .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing
+
+
+
+StandingAnimation:
+    .byte #$00, #$00, #$00, #$00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
