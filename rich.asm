@@ -39,7 +39,8 @@
     controller1Pressed:         .res 1
     controller1Held:            .res 1
 
-    playerState:                .res 1
+    playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv
+    playerAnimationCounter:             .res 1  
     ;; Constants
 
     distanceTestValueX:       .res 1
@@ -64,6 +65,7 @@
 
     SPRITE_RAM            = $0200
     playerXpos            = $0207       ; sprite 1 x pos
+    playerTile            = $0205
     playerYpos            = $0204       ; sprite 1 y pos
 
     timerSpriteYpos       = $0208
@@ -909,6 +911,64 @@ DoAction:
 
 DoNothing:
     rts 
+
+
+
+PlayerLogic:
+    lda playerState         ; Drinking - Walking - Peeing - Smoking - X - X - Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
+    asl 
+    bcc @NotDrinking
+    jsr DrinkingLogic
+    jmp @DoneState
+@NotDrinking:
+    asl 
+    bcc @NotWalking
+    jsr WalkingLogic
+    jmp @DoneState
+@NotWalking:
+    jsr StandingLogic
+
+@DoneState:
+    rts 
+
+StandingLogic:
+
+    lda playerAnimationCounter
+    cmp #$00
+    bne @BeenStanding
+    jsr StandingLogicStart
+    jmp @DoneStanding
+@BeenStanding:                                        ; check controller inputs and update position and states (maybe states will control the animations. like when state idks)
+     
+    and #%00001111
+    clc 
+    adc #$01
+    cmp #$10
+    sta playerAnimationCounter
+    bne @DoneStanding 
+    lda playerTile
+    eor #%00000001
+    sta playerTile
+
+                                  ; standing animation sprite update
+@DoneStanding:        
+    rts 
+StandingLogicStart:
+    clc 
+    adc #$01 
+    sta playerAnimationCounter
+    lda #$00
+    sta playerTile
+
+    rts 
+DrinkingLogic:
+    rts 
+DrinkingLogicStart:
+    rts 
+WalkingLogic:
+    rts 
+WalkingLogicStart:
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -995,7 +1055,7 @@ Main:
 
     jsr Timer2
     jsr readcontroller1
-
+    jsr StandingLogic
     ldx #$02
 
     lda controller1
@@ -1025,10 +1085,20 @@ rightNotPressed:
 
     jsr DoAction
 
+    lda flag1
+    and #%11111110
+    sta flag1
     jmp Main
 
 ;;;;;; vblank loop - called every frame ;;;;;
 VBLANK:
+    lda flag1           ; checking if lag frame: 0: Not lag frame, draw updates     1: Yes lag frame, return to let shit code finish before drawing
+    and #%00000001
+    cmp #$00
+    beq @VblankIsAGo
+    rti 
+
+@VblankIsAGo:
     lda flag1           ; setting nmi flag
     ora #%00000010  
     sta flag1
