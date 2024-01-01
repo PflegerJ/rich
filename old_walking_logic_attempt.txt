@@ -1,0 +1,137 @@
+This was my first attempt and the walking logic. I wanted to keep it cause it represents my thought process of all the things
+I needed to consider when walking, only to realize it didn't actually matter (as i write this it might cause of the weird straffing that idk if i want to keep)
+but yeah. 
+
+
+lda playerState
+    and #%00000011
+    cmp #$00    ; facing down
+    beq @CheckStillMovingDown
+    cmp #$01
+    beq @CheckStillMovingLeft
+    cmp #$02
+    beq @CheckStillMovingUp
+    cmp #$03
+    beq @CheckStillMovingRight
+
+    jmp @NotWalkingSameDirection
+
+@CheckStillMovingDown:
+    lda controller1Held         ; check if facing direction d-pad button is held (it can't be pressed cause it would have been pressed last frame)
+    and #%00000100
+    cmp #$04
+    bne @NotWalkingSameDirection      ; no longer holding down could be facing new direction or standing still still facing same direction
+    lda playerAnimationCounter  ; increment animation counter
+    clc 
+    adc #$01
+    sta playerAnimationCounter
+
+    jsr moveDown    ; move player down since we are holding down...
+                    ; now time to check if we have pressed or held right or left to also move that way
+    lda controller1Pressed
+    and #%00000011
+    ror 
+    bcs @AlsoMovingRight
+    ror 
+    bcs @AlsoMovingLeft
+
+    lda controller1Held     ; check held buttons too
+    and #%00000011
+    ror 
+    bcs @AlsoMovingRight
+    ror 
+    bcs @AlsoMovingLeft
+    jmp @WalkingLogicDone
+        ; just moving down
+
+ 
+
+@CheckStillMovingLeft:
+    lda controller1Held
+    and #%00000010              ; i think this is the left bit at this point i've messed it up so i only remember that i messed it up and have no actual clue
+    cmp #$02
+    bne @NotWalkingSameDirection
+    lda playerAnimationCounter  ; increment animation counter for whenever i fucking do that bullshit
+    clc 
+    adc #$01
+    sta playerAnimationCounter
+    jsr moveLeft        ; need to refactor the move subroutines. cause damn i cannot pick a format and stick with it to save my life
+
+    lda controller1Pressed
+    and #%00001100
+    sta temp1
+    lda controller1Held         ; i think this means if the button is pressed or held it should still work? idk im yoloing
+    and #%00001100
+    ora temp1
+    ror    ; don't care about moving right
+    ror     ; don't care about moving left
+    ror 
+    bcs @AlsoMovingDown
+    ror 
+    bcs @AlsoMovingUp
+    jmp @WalkingLogicDone
+
+@CheckStillMovingUp:
+    lda controller1Held
+    and #%00001000
+    cmp #%00001000
+    bne @NotWalkingSameDirection
+    lda playerAnimationCounter
+    clc 
+    adc #$01
+    sta playerAnimationCounter
+
+    jsr moveUp
+
+    lda controller1Pressed
+    and #%00001000
+    ror ; right
+    bcs @AlsoMovingRight
+    ror ; left
+    bcs @AlsoMovingLeft
+    jmp @WalkingLogicDone
+
+@CheckStillMovingRight:         ;; copy pasted from @CheckStillMovingLeft so the comments are what they are i guess for now
+ lda controller1Held
+    and #%00000001              ; i think this is the left bit at this point i've messed it up so i only remember that i messed it up and have no actual clue
+    cmp #$01
+    bne @NotWalkingSameDirection
+    lda playerAnimationCounter  ; increment animation counter for whenever i fucking do that bullshit
+    clc 
+    adc #$01
+    sta playerAnimationCounter
+    jsr moveRight        ; need to refactor the move subroutines. cause damn i cannot pick a format and stick with it to save my life
+
+    lda controller1Pressed
+    and #%00001100
+    sta temp1
+    lda controller1Held         ; i think this means if the button is pressed or held it should still work? idk im yoloing
+    and #%00001100
+    ora temp1
+    ror    ; don't care about moving right
+    ror     ; don't care about moving left
+    ror 
+    bcs @AlsoMovingDown
+    ror 
+    bcs @AlsoMovingUp
+    jmp @WalkingLogicDone
+
+@AlsoMovingUp:
+    jsr moveUp
+    jmp @WalkingLogicDone
+
+@AlsoMovingDown:
+    jsr moveDown
+    jmp @WalkingLogicDone 
+
+@AlsoMovingRight:
+    jsr moveRight
+    jmp @WalkingLogicDone
+
+@AlsoMovingLeft:
+    jsr moveLeft
+    jmp @WalkingLogicDone
+@NotWalkingSameDirection:  
+
+@WalkingLogicDone:  ; fuck will jmp still work after all this code? what is the range it can jmp to? idk how else to do it maybe hard coded address? that doesn't seem great...
+                        (It didn't thats what started this whole refactor of the subroutine lol)

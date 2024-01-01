@@ -237,20 +237,20 @@ loadattribute:
     BNE :-
     rts
 
-readcontroller1:
+ReadController1:
     LDA #$01
     STA $4016
     LDA #$00
     STA $4016
     LDX #$08
-readcontroller1loop:
+ReadController1Loop:
     LDA $4016
     LSR A           ; Logical shift right - all bits in A are shifted to the right, bit7 is 0 and whatever is in bit0 goes to Carry flag
     ROL controller1    ; Rotate left - opposite of LSR
     ;; used as a smart way to read controller inputs, as when each button is read, the button data is in bit0, and doing LSR puts the button 
     ;; in the Carry. Then ROL shifts the previous button data over and puts the carry back into bit0
     DEX 
-    BNE readcontroller1loop
+    BNE ReadController1Loop
     RTS 
 
 setPlayerStartingPos:
@@ -915,9 +915,9 @@ DoNothing:
 
 
 PlayerLogic:
-    lda playerState         ; Drinking - Walking - Peeing - Smoking - X - X - Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
+    lda playerState         ; Drinking - Walking - Peeing - Smoking - x - X - Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
     asl 
-    bcc @NotDrinking
+    bcc @NotDrinking        
     jsr DrinkingLogic
     jmp @DoneState
 @NotDrinking:
@@ -926,43 +926,70 @@ PlayerLogic:
     jsr WalkingLogic
     jmp @DoneState
 @NotWalking:
+    asl ; peeing
+    asl ; smoking
     jsr StandingLogic
+    jmp @DoneState
 
 @DoneState:
     rts 
 
 StandingLogic:
 
-    lda playerAnimationCounter
-    cmp #$00
-    bne @BeenStanding
-    jsr StandingLogicStart
-    jmp @DoneStanding
-@BeenStanding:                                        ; check controller inputs and update position and states (maybe states will control the animations. like when state idks)
-     
-    and #%00001111
+    lda playerAnimationCounter       ; load animation counter: used to determine where in the animation cycle the player is                             
+    and #%00001111                   ; animation cycles every 16 frames i guess?
     clc 
-    adc #$01
+    adc #$01                         ; i did it this way cause i was doing other shit that should have been done elsewhere. might have to edit this code i hope it still works for now
     cmp #$10
-    sta playerAnimationCounter
-    bne @DoneStanding 
-    lda playerTile
+    sta playerAnimationCounter          
+    bne @ControllerChecking          ; not updating sprite
+    lda playerTile                   ; flipping between sprites 0 and 1 for now
     eor #%00000001
     sta playerTile
 
-@ControllerChecking:
+@ControllerChecking:                    ; check input
     lda controller1Pressed
-    asl 
+    asl     ; start?
+    asl     ; select?
+    asl     ; a?
+    asl     ; b? i need to code more often cause i should remember the fucking order of user inputs 
+    asl ; up
+    bcs @StandingUpPressed      ; right now i only read one input. also need to incorperate the actual player movement into this instead of having it be in this old function that sucks balls
+    asl ; down
+    bcs @StandingDownPressed
+    asl ; left
+    bcs @StandingLeftPressed
+    asl ; right
+    bcs @StandingRightPressed
+    jmp @DoneStanding
 
-
+@StandingUpPressed:
+    lda #%01000010
+    sta playerState
+    jsr WalkingLogicStart
+    jmp @DoneStanding 
+@StandingDownPressed:
+    lda #%01000000
+    sta playerState
+    jsr WalkingLogicStart
+    jmp @DoneStanding
+@StandingRightPressed:
+    lda #%01000011
+    sta playerState
+    jsr WalkingLogicStart
+    jmp @DoneStanding
+@StandingLeftPressed:
+    lda #%01000001
+    sta playerState
+    jsr WalkingLogicStart
                                   ; standing animation sprite update
 @DoneStanding:        
     rts 
-StandingLogicStart:
-    clc 
-    adc #$01 
+
+StandingStateStart:
+    lda #$00  
     sta playerAnimationCounter
-    lda #$00
+    lda #$00                        ; first sprite of standing animation (obvi temp idk what ima do for animation but make it bad at first tand then better lets goooo)
     sta playerTile
 
     rts 
@@ -971,12 +998,169 @@ DrinkingLogic:
 DrinkingLogicStart:
     rts 
 WalkingLogic:
+
+    ;; check a b start first. those actions take prio over moving
+    jsr CheckWeStillWalking
+    beq @NotWalkingAnymore
+    jsr StillWalking
+    jmp @DoneWalking
+
+@NotWalkingAnymore:
+    lda playerState     ; not moving so standing state starts
+    and #%00000011
+    sta playerState
+    jsr StandingStateStart
+    ;; read no movement input. go back to standing
+@DoneWalking:
     rts 
+
+;;;; could i just assume start - select - A - B are all not pressed? cause i was thinking of prioing them. so if they were pressed then i would be in a different state already. 
+            ; wait unless they hit A with nothing to interact with. unless I want to make that a state
+            ; well lets do it the safe way for now and if i notice that i its always going to be 0000XXXX at this point then yay more clock cycles for other bad code 
+
+;; ok i optimized this funciton. it used to be (p and q) or (s and q). now its (p or s) and q. saved like 8 - 10 clock cycles per call nbd.
+CheckWeStillWalking:            ; this function will return 1 if we still walking 0 if we have stopped in the A reg
+         ; the value in A has to be 0 already so it works as the return value! yay optimization. im so good at saving 2 clock cycles and terrible at saving hundreds
+    lda controller1Pressed    ; 4
+    and #%00001111            ; 2
+    ora controller1Held       ; 4
+    and #%00001111            ; 2
+    rts 
+
+    ;; nothing is pressed so go back to standing
+
+    lda playerState
+    and #%00000011          ; set player state to standing while preserving facing direction
+    sta playerState
+
+@StoppedWalkingStartStanding:
+    jsr StandingStateStart 
+    rts 
+    ; i think its best to check if im still holding the same direction as im facing. 
+
+StillWalking:
+
+    ;;; ok first ima check if any movement buttons were held. cause if so, i can just do the animation 
+                ; right now the animation is don't change, but future obvi it will cont whatever.
+                ; I think i can also just do the movement and call it a day.  wait. so. when am i changing direction? cause the direction is already set from standing state subroutine.
+                    ; so like. and the animation counter has been reset from the startwalking function call right? i should make sure thats how i set it up.
+                    ; but like don't i just need to make sure no non-movement buttons were pressed. change playerState accordingly if so, and then
+                    ; just continue the animation, and apply the movement of the held and pressed buttons? so not even held or pressed right?
+                    ; just like controller1PreviousInput. right? just read that and call it a day? ok lets fucking yolo it and pray.
+
+
+    ;; ok so it mostly works -  the issue is if you are always holding a d-pad button down, you will never change your facing. so i guess that means you can walk backwards.
+            ; and i kind of was doing this so you could straif... maybe it could be with a held button. but you only have a and b. so it would have to be b. maybe b isn't drink...
+                ;; idk i only drank in my room. so A could be interact and just be at the computer passively drinking. doing an animation and decrementing inv. upping bladder scoring points.
+
+    ;; first animation.
+    lda playerAnimationCounter
+    clc 
+    adc #$01
+    sta playerAnimationCounter
+    ;; this is where animation shit would go? maybe just have like
+    ; jsr WalkingAnimation?
+    ;; but I want to at least inc the counter cause i have it so might as well think about it.
+
+
+    ;; ok now just apply the movement?
+    lda controller1PreviousInput
+    ror ; right?
+    bcc @NotMovingRight
+    ;; ok im yolo trying to use the stack to save this address. yolo you know
+    pha 
+    jsr moveRight
+    pla 
+
+@NotMovingRight:   
+    ror ; left?
+    bcc @NotMovingLeft
+    pha 
+    jsr moveLeft 
+    pla 
+
+@NotMovingLeft:
+    ror ; down?
+    bcc @NotMovingDown
+    pha 
+    jsr moveDown
+    pla 
+
+@NotMovingDown:
+    ror ; up?
+    bcc @NotMovingUp
+    pha 
+    jsr moveUp
+    pla 
+
+@NotMovingUp: 
+    rts 
+
 WalkingLogicStart:
+    lda #$00                    ; first reset animation counter
+    sta playerAnimationCounter
+    lda playerState             ; load in the player state and then AND it to get facing direction
+    and #%00000011
+    ; cmp #$00              ; I don't need to cmp here for 0. cause the AND will set the zero flag. and beq branches if the zero flag is 0. i think. or its the other way around and i'll figure out the bug eventually
+    beq @WalkingDownStart ; walking down
+
+    cmp #$01
+    beq @WalkingLeftStart
+    
+    cmp #$02
+    beq @WalkingUpStart
+
+@WalkingRightStart:
+
+    lda #$83
+    sta playerTile
+    jsr moveRight
+    jmp @WalkingStartDone
+
+@WalkingDownStart:
+    lda #$80
+    sta playerTile
+    jsr moveDown
+    jmp @WalkingStartDone
+
+@WalkingLeftStart:
+    lda #$81
+    sta playerTile
+    jsr moveLeft
+    jmp @WalkingStartDone
+
+@WalkingUpStart:
+    lda #$82
+    sta playerTile
+    jsr moveUp
+    jmp @WalkingStartDone
+
+@WalkingStartDone:
     rts 
+
+
+ControllerLogic:
+    jsr ReadController1
+    
+    ; compare controller inputs with previous to determine pressed and held buttons.
+    lda controller1PreviousInput    ; storing newly pressed buttons this frame
+    eor #$FF    ; bitwise not
+    and controller1
+    sta controller1Pressed
+
+
+    lda controller1PreviousInput    ; storing held buttons this frame
+    and controller1
+    sta controller1Held
+
+    lda controller1
+    sta controller1PreviousInput
+    rts 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
+
     sei			; disable IRQs
 	cld			; disable decimal mode
 	ldx	#$40
@@ -1059,29 +1243,29 @@ Main:
     sta flag1
 
     jsr Timer2
-    jsr readcontroller1
-    jsr StandingLogic
+    jsr ReadController1
+    jsr PlayerLogic
     ldx #$02
 
-    lda controller1
-    and #%00001000      ; checking if up is pressed
-    beq upNotPressed
-    jsr moveUp
+    ;lda controller1
+   ; and #%00001000      ; checking if up is pressed
+   ; beq upNotPressed
+   ; jsr moveUp
 upNotPressed:
-    lda controller1
-    and #%00000100      ; checking if down is pressed
-    beq downNotPressed
-    jsr moveDown
+ ;   lda controller1
+  ;  and #%00000100      ; checking if down is pressed
+  ;  beq downNotPressed
+   ; jsr moveDown
 downNotPressed:
-    lda controller1
-    and #%00000010
-    beq leftNotPressed
-    jsr moveLeft
+   ; lda controller1
+   ; and #%00000010
+   ; beq leftNotPressed
+   ; jsr moveLeft
 leftNotPressed:
-    lda controller1
-    and #%00000001
-    beq rightNotPressed
-    jsr moveRight
+   ; lda controller1
+   ; and #%00000001
+   ; beq rightNotPressed
+   ; jsr moveRight
 rightNotPressed:
     ;lda playerXpos
    ; sta $0203
@@ -1090,8 +1274,9 @@ rightNotPressed:
 
     jsr DoAction
 
-    lda flag1
-    and #%11111110
+    jsr ControllerLogic
+    lda flag1           ; sets lag frame flag to 0: means game logic done and can update spriets on next vblank
+    and #%11111110  
     sta flag1
     jmp Main
 
@@ -1162,7 +1347,7 @@ RoomBasedEventsHi:
 
 
 StandingAnimation:
-    .byte #$00, #$00, #$00, #$00
+    .byte $00, $00, $00, $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
