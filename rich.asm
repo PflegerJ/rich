@@ -34,12 +34,25 @@
     temp2:          .res 1
 
     flag1:        .res 1    ; bits: X - X - X - X - X - X - NMI Flag - Lag Frame Flag
+
+        ;; should I even have this? or should I keep if scott is active with scott?
+        ;; or i guess I could update scott every frame. which is insane. I already feel like having him have a random chance to change rooms every x time 
+                ;; not sure how i would do it. like per frame? or every x? i do ahve that frame counter thing for the timers. which I might want to do in a different way now. 
+                    ; a more general frame counter. and then the timers use it. instead of it linked with the timers. 
+
+   ; livingRoomFlag:     .res 1  ; bits: X - X - X - X - X - X - Scott Active
+        ; kind of fuck this flag idea. i'll keep where scott is with scott....I guess its with the room logic right?
+            ; so living room would call ScottLogic, and then scott would be like im not in there byeee, or i am and this what im doing.
+                ; and the balcony wouldn't even call it so it doesn't matter.
+    ; ok lets just do a scott var then
+
+    scottState:                 .res 1  ;   - States 3 bits - direction facing 2 bits - roomIndex? 3 bits       I think its 3 bit right ( 0 - 7 for values? at least for now)
     
     controller1PreviousInput:   .res 1
     controller1Pressed:         .res 1
     controller1Held:            .res 1
 
-    playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv
+    playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
     playerAnimationCounter:             .res 1  
     ;; Constants
 
@@ -117,6 +130,11 @@
     distanceTestTile        = $022D
     distanceTestAtt         = $022E
     distanceTestXpos        = $022F
+
+    scottYpos               = $0230
+    scottTile               = $0231
+    scottAtt                = $0232
+    scottXpos               = $0233
 
 .segment "CODE"
 
@@ -294,6 +312,11 @@ moveUp:
 
 @noCollision:
     jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr loadbackground
+@NoLoadingZoneFound:
     rts
 
 moveDown:
@@ -323,6 +346,11 @@ moveDown:
 
 @noCollision:
     jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr loadbackground
+@NoLoadingZoneFound:
     rts
 
 ;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
@@ -352,10 +380,17 @@ moveRight:
     jsr check_background_collision
     beq @noCollision
     dec playerXpos
-    rts
+    rts 
 @noCollision:
     jsr checkLoadingZone
-    rts
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr loadbackground
+@NoLoadingZoneFound:
+    rts 
+
+
 
 moveLeft:
     dec playerXpos
@@ -381,7 +416,12 @@ moveLeft:
 
 @noCollision:
     jsr checkLoadingZone
-    rts
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr loadbackground
+@NoLoadingZoneFound:
+    rts 
 
 
 
@@ -464,6 +504,10 @@ checkLoadingZone:
     tax                     ; first value in loadingzone table is the counter
     iny                     ; store the counter in x
 
+
+
+;; all this shit is a wild mess and will be a pain the ass later. 
+
 checkLoadingLoop:
     lda (pointerLo), y          ; y = 1
     cmp temp1                   ; compare x pos of player with x pos of loading zone
@@ -495,9 +539,22 @@ loadingZoneFound:
     iny
     lda (pointerLo), Y      ; y = 5
     sta playerYpos
+    iny 
+    
 
-    jsr loadbackground
-    rts
+    ;; ok so i need to call the loading function? of the room. cause just setting the player pos and then loading new background and collisoin is wack. 
+    ;; I would say maybe i do room specific things in background, but thats dumb. cause its the laoding trigger that is making shit change. so it should call the shit to change is my guess on how it should work.
+    lda (pointerLo), y 
+    pha 
+    iny 
+    lda (pointerLo), y 
+    pha 
+    lda #$FF
+    sta temp1
+    rts 
+
+    
+
 
 Timer:
     ;; increase time value each frame
@@ -752,7 +809,7 @@ DecrementScore:
 ;
 ; Proximity check
 ;   checks player proximity to certain objects
-;   hoping its based off roomID?
+;   hoping its based off roomIndex?
 ;   how can i use pointers to call subroutines...
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1053,6 +1110,14 @@ StillWalking:
             ; and i kind of was doing this so you could straif... maybe it could be with a held button. but you only have a and b. so it would have to be b. maybe b isn't drink...
                 ;; idk i only drank in my room. so A could be interact and just be at the computer passively drinking. doing an animation and decrementing inv. upping bladder scoring points.
 
+    ; ok wait. i could just check if a button matches the facing. and if not, hmmm, first try to flip? or check pressed?
+    ;; is this even neccisssarry? idk. i was trying to think of way a to not just walk backwards every where cause thats what i've been doing so far as i test..
+    ;; maybe I would have to add a straiffing sub state in one of the empty bits in playerState...
+    ; to have reduced movement speed. I guess i could just check if the move<Dirction> fucntion im about to call matches the direction.
+    ;; if not reduce speed. but thats for another day for sure.
+
+
+
     ;; first animation.
     lda playerAnimationCounter
     clc 
@@ -1061,13 +1126,14 @@ StillWalking:
     ;; this is where animation shit would go? maybe just have like
     ; jsr WalkingAnimation?
     ;; but I want to at least inc the counter cause i have it so might as well think about it.
+        ;; wait maybe this should be at the end... if i want to swap directions I guess...
 
 
     ;; ok now just apply the movement?
     lda controller1PreviousInput
     ror ; right?
     bcc @NotMovingRight
-    ;; ok im yolo trying to use the stack to save this address. yolo you know
+    ;; ok im yolo trying to use the stack to save the controller1PreviousInput since im roring bits off it. yolo you know
     pha 
     jsr moveRight
     pla 
@@ -1157,6 +1223,34 @@ ControllerLogic:
     sta controller1PreviousInput
     rts 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ScottLogic:
+    rts 
+
+ScottLoad:
+    lda scottState
+    and roomIndex
+    cmp roomIndex       ; i need to figure out the state after the and cause i think i can just branch based off z flag or somethign
+    beq @Activate11
+    rts 
+
+
+@Activate11:
+    lda #$00
+    sta scottAtt
+    
+LivingRoomLoad:
+    ;; ok so. what i need to run scott or something.
+    ;; would i call like generic scottLogic func? i don't feel like it. but if i just read if i only call it once then, i guess. no i would call it for every room scott could be in which is 2 but still
+    rts 
+
+JamesRoomLoad:
+
+    rts 
+
+Random:
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -1360,13 +1454,13 @@ StandingAnimation:
 
 JamesRoomLoadZone:
     .byte $02
-    .byte $28, $B0, $01, $C0, $44   
-    .byte $28, $B8, $01, $C0, $44
+    .byte $28, $B0, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
+    .byte $28, $B8, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
 
 LivingRoomLoadZone:
     .byte $0A
-    .byte $C8, $40, $00, $38, $B6 ; james room
-    .byte $C8, $48, $00, $38, $B6
+    .byte $C8, $40, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1 ;james room
+    .byte $C8, $48, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1
 
     .byte $C8, $68, $02, $38, $34 ; scotts room
     .byte $C8, $60, $02, $38, $34 
@@ -1800,7 +1894,14 @@ sprites: ;  y  tile  att  x
     .byte $20, $09, $00, $68        ; score 1000s
     .byte $20, $00, $00, $60        ; score 10000s
 
-    .byte $80, $01, $00, $80        ; sprite pos for distance testing
+    .byte $80, $00, %00100000, $80        ; scott
+
+        ;; weird idea. what if i just like yolo the sprites. like. is this what a buffer is? cause ive understood the conecpt but never the freaking impelmentation. 
+                ;; so like. instead of writing directly to $02XX, is it better to write somewhere else... i guess as i write that out it seems like a no.. idk.
+                ;; hmm let me think. I guess one thing thats semi related i guess. but like. right now every entity is hard coded. and for timers i guess that makes sense, and same for palyer.
+                ;; but do I need every npc location known at all times. or at least taking up memory? 
+                ;; so I'll need to write a better sprite and background shit probs. idk if I can with back ground, but at least... idk i think doing mapping can be saved for next proj
+                ;; who knows though
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   
@@ -2084,4 +2185,4 @@ bitMask:
     .word 0
 
 .segment "CHARS"
-    .incbin "mario.chr"
+    .incbin "mario.chr" 
