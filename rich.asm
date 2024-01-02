@@ -524,6 +524,8 @@ checkLoadingLoop:
     iny                         ; y = 4
     iny                         ; y = 5
     iny                         ; y = 6
+    iny 
+    iny 
     dex                         
     cpx #$00
     BNE checkLoadingLoop
@@ -1226,6 +1228,13 @@ ControllerLogic:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ScottLogic:
+
+    ;; check scotts state
+    lda scottState
+    
+    ;; do actions depending on state
+    ;; check if state needs to change? idk if with time? or if flags get set or something
+
     rts 
 
 ScottLoad:
@@ -1239,7 +1248,21 @@ ScottLoad:
 @Activate11:
     lda #$00
     sta scottAtt
-    
+    rts 
+
+ScottUnload:
+    lda #%00100000
+    sta scottAtt
+    rts 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; What if... i do the background, hitmap and all the other bullshit in the RoomLoad function instead of having it set in the loadzone table...
+    ;; like i don't need player starting pos and ish in that table. just the position of the loading zone and what room they load into?
+    ;; cause i could use the roomIndex to know what room i can from to set player pos. then use the new roomIndex to load the background and other crap,
+    ;; while also loading in any other sprites (living room load scott if applicable, store load customers and crap)
+    ;; that would also make it so its not the loading zone's job to know shit about what happens in the zone it loads into, it just cares hey you touched me this is where you going now)
+    ;; cool i think this is better. idk if i'll change it right now but i'll get to it cause i think it will be a headache when more rooms actually have specific shit they doing
+
 LivingRoomLoad:
     ;; ok so. what i need to run scott or something.
     ;; would i call like generic scottLogic func? i don't feel like it. but if i just read if i only call it once then, i guess. no i would call it for every room scott could be in which is 2 but still
@@ -1249,12 +1272,24 @@ JamesRoomLoad:
 
     rts 
 
+BathRoomLoad:
+    rts 
+
+ScottRoomLoad:
+    rts 
+
+BalconyLoad: 
+    rts 
+Outside1Load:
+    rts 
+
+
 Random:
     rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
-
+ 
     sei			; disable IRQs
 	cld			; disable decimal mode
 	ldx	#$40
@@ -1462,31 +1497,31 @@ LivingRoomLoadZone:
     .byte $C8, $40, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1 ;james room
     .byte $C8, $48, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1
 
-    .byte $C8, $68, $02, $38, $34 ; scotts room
-    .byte $C8, $60, $02, $38, $34 
+    .byte $C8, $68, $02, $38, $34, >ScottRoomLoad, <ScottRoomLoad - 1 ; scotts room
+    .byte $C8, $60, $02, $38, $34, >ScottRoomLoad, <ScottRoomLoad - 1 
 
-    .byte $B0, $28, $03, $A3, $68 ; bathroom
-    .byte $B8, $28, $03, $A3, $68
+    .byte $B0, $28, $03, $A3, $68, >BathRoomLoad, <BathRoomLoad - 1 ; bathroom
+    .byte $B8, $28, $03, $A3, $68, >BathRoomLoad, <BathRoomLoad - 1
 
-    .byte $30, $B8, $04, $C0, $84 ; balcony
-    .byte $30, $B0, $04, $C0, $84
+    .byte $30, $B8, $04, $C0, $84, >BalconyLoad, <BalconyLoad - 1 ; balcony
+    .byte $30, $B0, $04, $C0, $84, >BalconyLoad, <BalconyLoad - 1
 
-    .byte $78, $28, $04, $C0, $50 ; balcony lower
-    .byte $70, $28, $04, $C0, $50
+    .byte $78, $28, $04, $C0, $50, >BalconyLoad, <BalconyLoad - 1 ; balcony lower
+    .byte $70, $28, $04, $C0, $50, >BalconyLoad, <BalconyLoad - 1
 
 ScottRoomLoadZone:
     .byte $02
-    .byte $28, $30, $01, $C0, $63   ; living room
-    .byte $28, $38, $01, $C0, $63
+    .byte $28, $30, $01, $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1 ; living room
+    .byte $28, $38, $01, $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1
 
 BathroomLoadZone:
     .byte $02
-    .byte $A0, $78, $01, $B3, $30
-    .byte $A8, $78, $01, $B3, $30
+    .byte $A0, $78, $01, $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $A8, $78, $01, $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
 BalconyLoadZone:
     .byte $02
-    .byte $D0, $80, $01, $38, $B4
-    .byte $D0, $88, $01, $38, $B4
+    .byte $D0, $80, $01, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $D0, $88, $01, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
 Outside1LoadZone:
     .byte $00
 
