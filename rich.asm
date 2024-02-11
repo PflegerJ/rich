@@ -23,7 +23,7 @@
    ; playerXpos:     .res 1  
    ; playerYpos:     .res 1
     nameTable:      .res 1  ; which nametable to load
-    roomIndex:      .res 1
+    roomIndex:      .res 1  ;;;; could make it bits 765, for previous roomIndex. and bits 210 are for current roomIndex?
     spriteCount:    .res 1
     frameCounter60: .res 1
     gameTime:       .res 2
@@ -47,7 +47,7 @@
     ; ok lets just do a scott var then
 
     scottState:                 .res 1  ;   - States 3 bits - direction facing 2 bits - roomIndex? 3 bits       I think its 3 bit right ( 0 - 7 for values? at least for now)
-    
+                                        ;  i also need to save scotts last position? so thats 4 bits right there. might need another byte for that. cause eventually it would be cool to do a RAM thing where i only load in the sprites im using, not just turn them to behind background or whatever 
     controller1PreviousInput:   .res 1
     controller1Pressed:         .res 1
     controller1Held:            .res 1
@@ -194,7 +194,10 @@ loadbackground:
     LDa #$00
     STA PPU_ADDRESS             ; write low byte of $2000 address
 
-    ldx roomIndex
+    ;lda roomIndex
+    ;and #%00000111
+    ;tax
+    ldx roomIndex 
     lda BackgroundLo, x
     sta pointerLo
     lda BackgroundHi, X
@@ -240,7 +243,10 @@ loadattribute:
     STA PPU_ADDRESS
     LDX #$00
 
-    ldx roomIndex
+    ;lda roomIndex
+    ;and #$07
+    ;tax
+    ldx roomIndex 
     lda AttributeTableLo, X
     sta pointerLo
     lda AttributeTableHi, x
@@ -315,7 +321,8 @@ moveUp:
     lda temp1
     cmp #$FF
     bne @NoLoadingZoneFound
-    jsr loadbackground
+    jsr LoadRoom
+   ; jsr loadbackground
 @NoLoadingZoneFound:
     rts
 
@@ -349,7 +356,8 @@ moveDown:
     lda temp1
     cmp #$FF
     bne @NoLoadingZoneFound
-    jsr loadbackground
+    jsr LoadRoom
+   ; jsr loadbackground
 @NoLoadingZoneFound:
     rts
 
@@ -386,7 +394,8 @@ moveRight:
     lda temp1
     cmp #$FF
     bne @NoLoadingZoneFound
-    jsr loadbackground
+    jsr LoadRoom
+    ;jsr loadbackground
 @NoLoadingZoneFound:
     rts 
 
@@ -419,7 +428,8 @@ moveLeft:
     lda temp1
     cmp #$FF
     bne @NoLoadingZoneFound
-    jsr loadbackground
+    jsr LoadRoom
+   ; jsr loadbackground
 @NoLoadingZoneFound:
     rts 
 
@@ -507,7 +517,12 @@ checkLoadingZone:
 
 
 ;; all this shit is a wild mess and will be a pain the ass later. 
+;; well its later. not really that much later. but i think its time to fix this bullshit
 
+
+;; ok. so the main things is. i want the room we are loading into to handle where the player starting pos is, and to call for the background to be loaded and all that.
+        ;; so the loading zone should just have its location. check if that matches the player, and then have which room it loads into. thats it? the rest are handled by room unloading subroutine and room loading sub?
+        ;; so i could have 2 tables indexed by roomIndex. one for loading and one for unloading. 
 checkLoadingLoop:
     lda (pointerLo), y          ; y = 1
     cmp temp1                   ; compare x pos of player with x pos of loading zone
@@ -522,10 +537,10 @@ checkLoadingLoop:
 @bottomOfLoop:                  ; increment y if for next loop iteration if there are multiple possible loading zones in this map
     iny                         ; y = 3
     iny                         ; y = 4
-    iny                         ; y = 5
-    iny                         ; y = 6
-    iny 
-    iny 
+    ;iny                         ; y = 5
+    ;iny                         ; y = 6
+    ;iny 
+    ;iny 
     dex                         
     cpx #$00
     BNE checkLoadingLoop
@@ -535,22 +550,22 @@ loadingZoneFound:
     iny                     ; y = 3
     lda (pointerLo), y      ; storing roomIndex that loading zone loads into
     sta roomIndex
-    iny                        ; Setting starting pos of player based of what loading zone triggered
-    lda (pointerLo), Y      ; y = 4
-    sta playerXpos
-    iny
-    lda (pointerLo), Y      ; y = 5
-    sta playerYpos
-    iny 
+   ; iny                        ; Setting starting pos of player based of what loading zone triggered
+  ; lda (pointerLo), Y      ; y = 4
+   ; sta playerXpos
+   ; iny
+   ; lda (pointerLo), Y      ; y = 5
+   ; sta playerYpos
+   ; iny 
     
 
     ;; ok so i need to call the loading function? of the room. cause just setting the player pos and then loading new background and collisoin is wack. 
     ;; I would say maybe i do room specific things in background, but thats dumb. cause its the laoding trigger that is making shit change. so it should call the shit to change is my guess on how it should work.
-    lda (pointerLo), y 
-    pha 
-    iny 
-    lda (pointerLo), y 
-    pha 
+   ; lda (pointerLo), y 
+  ;  pha 
+   ; iny 
+   ; lda (pointerLo), y 
+   ; pha 
     lda #$FF
     sta temp1
     rts 
@@ -1254,6 +1269,26 @@ ScottUnload:
     lda #%00100000
     sta scottAtt
     rts 
+
+
+
+;; function to call to load a room. Assumes the roomindex as already been set
+LoadRoom:
+
+    ;jsr loadbackground
+    lda roomIndex
+    and #%00000111  ; and to only check last 3 bits for roomIndex to use as off set. first 3 bits could be used for doorIndex so we need to clear them
+    tay 
+    lda RoomLoadingHi, y 
+    pha 
+    lda RoomLoadingLo, y 
+    pha  
+    lda roomIndex
+    and #%00000111
+    sta roomIndex
+    jsr loadbackground
+    rts     ; this rts will jump into the correct RoomLoad function. then the program will return back to the movement fucntion where it saw it had a loading zone hit.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; What if... i do the background, hitmap and all the other bullshit in the RoomLoad function instead of having it set in the loadzone table...
@@ -1262,20 +1297,69 @@ ScottUnload:
     ;; while also loading in any other sprites (living room load scott if applicable, store load customers and crap)
     ;; that would also make it so its not the loading zone's job to know shit about what happens in the zone it loads into, it just cares hey you touched me this is where you going now)
     ;; cool i think this is better. idk if i'll change it right now but i'll get to it cause i think it will be a headache when more rooms actually have specific shit they doing
-
 LivingRoomLoad:
     ;; ok so. what i need to run scott or something.
     ;; would i call like generic scottLogic func? i don't feel like it. but if i just read if i only call it once then, i guess. no i would call it for every room scott could be in which is 2 but still
+    
+    ;; ok i need to set player pos. i need to load background and hitmap. i will eventually need to load pallette. i need to load scott.
+    jsr ScottLoad
+    ;; i think player pos is first. cause then i can use roomIndex for background and hitmap?
+    lda roomIndex ; im assuming its already set for previous and current rooms? like load zone will set next room and previous room so it should be already what it is. might even already still be in the A reg? no i have to call this function with a pointer
+    
+    ;; lets get the background first
+    and #%00000111
+    ;jsr loadbackground
+
+    ;; scott is in charge of scott. his load function will check if he should be loaded or not and where he should be. the room loading function just needs to know that he might be loaded and call his load function
+    
+
+    tay 
+    lda RoomStartPosLo, y
+    sta pointerLo
+    lda RoomStartPosHi, Y
+    sta pointerHi
+
+
+    lda roomIndex    
+    ;and #%11100000      ;; ok issue with this implementation. is i need to bit shift if i want to use it in a table index look up. which is fine. but so i shouldn't and it and just shift?
+    lsr ;01110000
+    lsr ;00111000
+    lsr ;00011100
+    lsr ;00001110           ;; ok im calling this funciton for a table. so i used the roomIndex to call this function. so i don't need to use a table for what room. just go straight to this room table.
+    ;lsr ;00000111  ;; im mulitplying it by 2 cause each entry has 2 bytes for x and y pos. i think this works oh god please
+    tay 
+    lda (pointerLo), y 
+    sta playerXpos
+    iny 
+    lda (pointerLo), Y
+    sta playerYpos 
+    lda roomIndex
+    and #$07
+    sta roomIndex
+
     rts 
 
-JamesRoomLoad:
+LivingRoomUnLoad:
+    ;; do i need an unload function? cause like. when do we change what room scott is in? can't be the time function cause he would just disappear. unless i have him walk to his room at a certain time... which would work. but what if i'm not
+            ;; in the living room when that would happen? i guess scott doing shit while he is loaded would be handled in scott logic. so i just need to think
+            ;; about how to know when he changes rooms when he isn't loaded... which is based on time. so maybe instead of checking his previous roomIndex i check the time? idk.... i need to just yolo something and then fix it later if its wrong cause that is how i work but im kind of stuckkk
+    jsr ScottUnload
+    
+    rts 
 
+;; so im using the roomindex as an index to get the right player starting pos. i get room index, make sure its just the last 3 bits, then get the values at that index for starting pos.
+JamesRoomLoad:  
+    jsr SetPlayerPositionOneOption
+    rts 
+JamesRoomUnLoad:
     rts 
 
 BathRoomLoad:
+    jsr SetPlayerPositionOneOption
     rts 
 
 ScottRoomLoad:
+    jsr SetPlayerPositionOneOption
     rts 
 
 BalconyLoad: 
@@ -1284,8 +1368,65 @@ Outside1Load:
     rts 
 
 
+
 Random:
+    rts
+;; So i think i need to call this when i load a room. cause like. i don't think the loading zone needs to know the starting location anymore. esp since i have to call the room loading function anyways...
+    ;; it makes more sense for the room to know where to load into. i think. but it would have to be based off what room we were coming from...
+SetPlayerPositionOneOption: 
+    lda roomIndex
+    and #%00000111
+    sta roomIndex 
+    tay 
+    lda RoomStartPosLo, y
+    sta pointerLo
+    lda RoomStartPosHi, Y
+    sta pointerHi
+
+    ldy #$00
+    lda (pointerLo), y 
+    sta playerXpos
+    iny 
+    lda (pointerLo), Y
+    sta playerYpos
     rts 
+
+SetPlayerPositionMultipleOptions:
+     lda roomIndex ; im assuming its already set for previous and current rooms? like load zone will set next room and previous room so it should be already what it is. might even already still be in the A reg? no i have to call this function with a pointer
+    
+    ;; lets get the background first
+    and #%00000111
+    ;jsr loadbackground
+
+    ;; scott is in charge of scott. his load function will check if he should be loaded or not and where he should be. the room loading function just needs to know that he might be loaded and call his load function
+    
+
+    tay 
+    lda RoomStartPosLo, y
+    sta pointerLo
+    lda RoomStartPosHi, Y
+    sta pointerHi
+
+
+    lda roomIndex    
+    ;and #%11100000      ;; ok issue with this implementation. is i need to bit shift if i want to use it in a table index look up. which is fine. but so i shouldn't and it and just shift?
+    lsr ;01110000
+    lsr ;00111000
+    lsr ;00011100
+    lsr ;00001110           ;; ok im calling this funciton for a table. so i used the roomIndex to call this function. so i don't need to use a table for what room. just go straight to this room table.
+    ;lsr ;00000111  ;; im mulitplying it by 2 cause each entry has 2 bytes for x and y pos. i think this works oh god please
+    tay 
+    lda (pointerLo), y 
+    sta playerXpos
+    iny 
+    lda (pointerLo), Y
+    sta playerYpos
+    lda roomIndex
+    and #%00000111
+    sta roomIndex 
+    rts 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -1473,7 +1614,10 @@ RoomBasedEventsLo:
 RoomBasedEventsHi:
     .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing
 
-
+RoomLoadingLo:
+    .byte <JamesRoomLoad - 1, <LivingRoomLoad - 1, <ScottRoomLoad - 1, <BathRoomLoad - 1, <BalconyLoad - 1
+RoomLoadingHi:
+    .byte >JamesRoomLoad, >LivingRoomLoad, >ScottRoomLoad, >BathRoomLoad, >BalconyLoad
 
 StandingAnimation:
     .byte $00, $00, $00, $00
@@ -1489,39 +1633,46 @@ StandingAnimation:
 
 JamesRoomLoadZone:
     .byte $02
-    .byte $28, $B0, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
-    .byte $28, $B8, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
+    .byte $28, $B0, %00000001 ;$01, $00  
+    .byte $28, $B8, $01  
+    ;.byte $28, $B0, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
+    ;.byte $28, $B8, $01, $C0, $44, >LivingRoomLoad, <LivingRoomLoad - 1  
+
+    ;.byte $28, $B0, $01  
+   ; .byte $28, $B8, $01
 
 LivingRoomLoadZone:
     .byte $0A
-    .byte $C8, $40, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1 ;james room
-    .byte $C8, $48, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1
+    .byte $C8, $40, $00
+    .byte $C8, $48, $00
+    ;.byte $C8, $40, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1 ;james room
+    ;.byte $C8, $48, $00, $38, $B6, >JamesRoomLoad, <JamesRoomLoad - 1
 
-    .byte $C8, $68, $02, $38, $34, >ScottRoomLoad, <ScottRoomLoad - 1 ; scotts room
-    .byte $C8, $60, $02, $38, $34, >ScottRoomLoad, <ScottRoomLoad - 1 
+    .byte $C8, $68, $02    ; scotts room
+    .byte $C8, $60, $02
 
-    .byte $B0, $28, $03, $A3, $68, >BathRoomLoad, <BathRoomLoad - 1 ; bathroom
-    .byte $B8, $28, $03, $A3, $68, >BathRoomLoad, <BathRoomLoad - 1
+    .byte $B0, $28, $03    ; bathroom
+    .byte $B8, $28, $03
 
-    .byte $30, $B8, $04, $C0, $84, >BalconyLoad, <BalconyLoad - 1 ; balcony
-    .byte $30, $B0, $04, $C0, $84, >BalconyLoad, <BalconyLoad - 1
+    .byte $30, $B8, %00000100   ;   $04, $C0, $84, >BalconyLoad, <BalconyLoad - 1 ; balcony
+    .byte $30, $B0, %00000100   ;$04, $C0, $84, >BalconyLoad, <BalconyLoad - 1
 
-    .byte $78, $28, $04, $C0, $50, >BalconyLoad, <BalconyLoad - 1 ; balcony lower
-    .byte $70, $28, $04, $C0, $50, >BalconyLoad, <BalconyLoad - 1
+    .byte $78, $28, %00100100 ;$04, $C0, $50, >BalconyLoad, <BalconyLoad - 1 ; balcony lower
+    .byte $70, $28, %00100100   ;$04, $C0, $50, >BalconyLoad, <BalconyLoad - 1
 
 ScottRoomLoadZone:
     .byte $02
-    .byte $28, $30, $01, $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1 ; living room
-    .byte $28, $38, $01, $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $28, $30, $21 ; $01  ; , $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1 ; living room
+    .byte $28, $38, $21 ;$01  ; , $C0, $63, >LivingRoomLoad, <LivingRoomLoad - 1
 
 BathroomLoadZone:
     .byte $02
-    .byte $A0, $78, $01, $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
-    .byte $A8, $78, $01, $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $A0, $78, $31  ; , $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $A8, $78, $31  ; , $B3, $30, >LivingRoomLoad, <LivingRoomLoad - 1
 BalconyLoadZone:
     .byte $02
-    .byte $D0, $80, $01, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
-    .byte $D0, $88, $01, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $D0, $80, $41  ;, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
+    .byte $D0, $88, $41   ;, $38, $B4, >LivingRoomLoad, <LivingRoomLoad - 1
 Outside1LoadZone:
     .byte $00
 
@@ -1541,14 +1692,20 @@ StoreLoadZone:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+RoomStartPosLo: 
+    .byte <JamesRoomStartPos, <LivingRoomStartPos, <ScottRoomStartPos, <BathroomStartPos
+RoomStartPosHi:
+    .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos
+
+
 JamesRoomStartPos:
-    .byte $80,$80
-LivingRoomStartPos:
-    .byte $40,$40
+    .byte $38,$B6
+LivingRoomStartPos:     ; each pair is a starting pos coming from: James room, front door, scotts room, bathroom, balcony
+    .byte $C0, $44, $83, $83, $C0, $63, $B3, $30, $38, $B4
 ScottRoomStartPos:
-    .byte $80,$80
+    .byte $60,$60
 BathroomStartPos:
-    .byte $80,$80
+    .byte $A5,$70
 BalconyStartPos:
     .byte $80,$80
 StoreStartPos:
