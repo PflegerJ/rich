@@ -549,7 +549,15 @@ checkLoadingLoop:
 loadingZoneFound:
     iny                     ; y = 3
     lda (pointerLo), y      ; storing roomIndex that loading zone loads into
+    and #%00000111
     sta roomIndex
+    lda (pointerLo), y 
+    and #%11110000      ;; this is cause i can't figure out how to call loadbackground after using the front half of roomindex. i could call it in each rooms specific load function. but i kind of don't want to... will probably change later but fuck ti for now
+    lsr 
+    lsr 
+    lsr 
+  ;  lsr 
+    sta temp2
    ; iny                        ; Setting starting pos of player based of what loading zone triggered
   ; lda (pointerLo), Y      ; y = 4
    ; sta playerXpos
@@ -1277,15 +1285,14 @@ LoadRoom:
 
     ;jsr loadbackground
     lda roomIndex
-    and #%00000111  ; and to only check last 3 bits for roomIndex to use as off set. first 3 bits could be used for doorIndex so we need to clear them
     tay 
     lda RoomLoadingHi, y 
     pha 
     lda RoomLoadingLo, y 
     pha  
-    lda roomIndex
-    and #%00000111
-    sta roomIndex
+   ; lda roomIndex
+    ;and #%00000111
+    sty roomIndex       ; this should clear the doorIndex at the start of the roomIndex byte and then we don't have to clear it everywhere yay
     jsr loadbackground
     rts     ; this rts will jump into the correct RoomLoad function. then the program will return back to the movement fucntion where it saw it had a loading zone hit.
 
@@ -1303,40 +1310,7 @@ LivingRoomLoad:
     
     ;; ok i need to set player pos. i need to load background and hitmap. i will eventually need to load pallette. i need to load scott.
     jsr ScottLoad
-    ;; i think player pos is first. cause then i can use roomIndex for background and hitmap?
-    lda roomIndex ; im assuming its already set for previous and current rooms? like load zone will set next room and previous room so it should be already what it is. might even already still be in the A reg? no i have to call this function with a pointer
-    
-    ;; lets get the background first
-    and #%00000111
-    ;jsr loadbackground
-
-    ;; scott is in charge of scott. his load function will check if he should be loaded or not and where he should be. the room loading function just needs to know that he might be loaded and call his load function
-    
-
-    tay 
-    lda RoomStartPosLo, y
-    sta pointerLo
-    lda RoomStartPosHi, Y
-    sta pointerHi
-
-
-    lda roomIndex    
-    ;and #%11100000      ;; ok issue with this implementation. is i need to bit shift if i want to use it in a table index look up. which is fine. but so i shouldn't and it and just shift?
-    lsr ;01110000
-    lsr ;00111000
-    lsr ;00011100
-    lsr ;00001110           ;; ok im calling this funciton for a table. so i used the roomIndex to call this function. so i don't need to use a table for what room. just go straight to this room table.
-    ;lsr ;00000111  ;; im mulitplying it by 2 cause each entry has 2 bytes for x and y pos. i think this works oh god please
-    tay 
-    lda (pointerLo), y 
-    sta playerXpos
-    iny 
-    lda (pointerLo), Y
-    sta playerYpos 
-    lda roomIndex
-    and #$07
-    sta roomIndex
-
+    jsr SetPlayerPositionMultipleOptions
     rts 
 
 LivingRoomUnLoad:
@@ -1374,10 +1348,7 @@ Random:
 ;; So i think i need to call this when i load a room. cause like. i don't think the loading zone needs to know the starting location anymore. esp since i have to call the room loading function anyways...
     ;; it makes more sense for the room to know where to load into. i think. but it would have to be based off what room we were coming from...
 SetPlayerPositionOneOption: 
-    lda roomIndex
-    and #%00000111
-    sta roomIndex 
-    tay 
+    ldy roomIndex 
     lda RoomStartPosLo, y
     sta pointerLo
     lda RoomStartPosHi, Y
@@ -1392,15 +1363,7 @@ SetPlayerPositionOneOption:
     rts 
 
 SetPlayerPositionMultipleOptions:
-     lda roomIndex ; im assuming its already set for previous and current rooms? like load zone will set next room and previous room so it should be already what it is. might even already still be in the A reg? no i have to call this function with a pointer
-    
-    ;; lets get the background first
-    and #%00000111
-    ;jsr loadbackground
-
-    ;; scott is in charge of scott. his load function will check if he should be loaded or not and where he should be. the room loading function just needs to know that he might be loaded and call his load function
-    
-
+    lda roomIndex ; im assuming its already set for previous and current rooms? like load zone will set next room and previous room so it should be already what it is. might even already still be in the A reg? no i have to call this function with a pointer
     tay 
     lda RoomStartPosLo, y
     sta pointerLo
@@ -1408,22 +1371,12 @@ SetPlayerPositionMultipleOptions:
     sta pointerHi
 
 
-    lda roomIndex    
-    ;and #%11100000      ;; ok issue with this implementation. is i need to bit shift if i want to use it in a table index look up. which is fine. but so i shouldn't and it and just shift?
-    lsr ;01110000
-    lsr ;00111000
-    lsr ;00011100
-    lsr ;00001110           ;; ok im calling this funciton for a table. so i used the roomIndex to call this function. so i don't need to use a table for what room. just go straight to this room table.
-    ;lsr ;00000111  ;; im mulitplying it by 2 cause each entry has 2 bytes for x and y pos. i think this works oh god please
-    tay 
+    ldy temp2    
     lda (pointerLo), y 
     sta playerXpos
     iny 
     lda (pointerLo), Y
-    sta playerYpos
-    lda roomIndex
-    and #%00000111
-    sta roomIndex 
+    sta playerYpos 
     rts 
 
 
@@ -1693,17 +1646,17 @@ StoreLoadZone:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RoomStartPosLo: 
-    .byte <JamesRoomStartPos, <LivingRoomStartPos, <ScottRoomStartPos, <BathroomStartPos
+    .byte <JamesRoomStartPos, <LivingRoomStartPos, <ScottRoomStartPos, <BathroomStartPos, <BalconyStartPos
 RoomStartPosHi:
-    .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos
+    .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos
 
 
 JamesRoomStartPos:
     .byte $38,$B6
 LivingRoomStartPos:     ; each pair is a starting pos coming from: James room, front door, scotts room, bathroom, balcony
-    .byte $C0, $44, $83, $83, $C0, $63, $B3, $30, $38, $B4
+    .byte $C0, $44, $C0, $44, $C0, $63, $B4, $31, $38, $B4
 ScottRoomStartPos:
-    .byte $60,$60
+    .byte $3A,$33
 BathroomStartPos:
     .byte $A5,$70
 BalconyStartPos:
