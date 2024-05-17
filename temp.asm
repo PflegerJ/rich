@@ -1053,7 +1053,7 @@ StandingLogic:
     jmp @DoneStanding
 @StandingAPressed:
     jsr StandingAPressedTest
-    jmp @DoneStanding
+
     ;jsr Interact   ; might be this call down the road. right now just making sure i can press A while standing and something happens
 @StandingUpPressed:
     lda #%01000010
@@ -1248,114 +1248,14 @@ StandingAPressedTest:
     sta aButtonTestTile
     lda #$90
     sta aButtonTestXpos
-    lda #$80
     sta aButtonTestYpos
     lda #$00
     sta aButtonTestAtt
 
 @aButtonTestInit:
-    
-
-    jsr CheckTileInFront
-    rts 
-
-CheckTileInFront:
-    ; i want to check the tile in front of the player to see if that tile contains something the player can interact with
-    ; so what do i need to do......
-    ; First i need to get the player's position and reduce it into a tile. so what... just remove the last 3 bits? 
-    ; where is the actual position? isn't it like 1 pixel above the sprite? 
-
-    ; lets yolo
-    ; lets grab players pos, adjust to reflect where the sprite is and remove last 3 bits.
-    ; just store into temp1 and temp2 for now
-
-    
-
-    lda playerYpos
-    clc 
-    adc #$01
-    and #$F8
-    sta temp2   ; this gets the player y pos, adjusts cause its 1 pixel higher than the sprite, then clears the last 3 digits. 
-                    ; i will have to change this cause it will def be weird when trying to interact with something either slightly above or below idk which but one of them for sure
-    lda playerXpos
-    
-    
-
-    and #$F8            ; don't need to adjust y? wait i only need to adjust y
-    sta temp1
-
-; this is taking player facing direction into account. so ima store the value as one tile over in the direction the player is facing
-        ; again this will have to be updated if i don't AND the last 3 bits to 0 so that i can interact with things inbetween tiles
-        ; Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
-    lda playerState
-    and #$03
-    cmp #$00        ; facing down
-    bne @notFacingDown
-    lda #$08
-    clc 
-    adc temp2
-    sta temp2
-    jmp @doneWithFacing
-
-@notFacingDown:
-    cmp #$01        ; facing left
-    bne @notFacingLeft
-    lda #$08
-    sec 
-    sbc temp1
-    sta temp1
-    jmp @doneWithFacing
-
-@notFacingLeft:
-    cmp #$02        ; facing up
-    bne @notFacingUp
-    lda #$08
-    sec 
-    sbc temp2
-    sta temp2
-    jmp @doneWithFacing
-
-@notFacingUp:
-    lda #$08        ; facing right
-    clc 
-    adc temp1
-    sta temp1
-
-@doneWithFacing:
-    ldy roomIndex
-    lda RoomInteractLo, y
-    sta pointerLo
-    lda RoomInteractHi, y
-    sta pointerHi
-    ldy #$00            ; y is now the loop counter thing
-    lda (pointerLo), y  ; this grabs the count and can be used at the loop count limit
-    tax                 ; so lets put it in x
-
-
-@interactLoop:
-    iny         
-    lda (pointerLo), y  ; this is the x pos of the interactable obj
-    cmp temp1
-    bne @interactLoopXNotMatch
-    iny 
-    lda (pointerLo), y 
-    cmp temp2
-    bne @interactLoopYNotMatch
-        ; if we here then both x and y pos match
-        ; this is where we would call the code for that specific obj. probably store the pointers in the location table
     lda aButtonTestAtt
-    eor #%10000000
+    eor #%00100000
     sta aButtonTestAtt
-    jmp @interactLoopEnd
-    ; ok so temp1 is player x pos rounded to nearest tile, temp2 is adjusted then rounded to nearest tile
-@interactLoopXNotMatch:
-    iny 
-@interactLoopYNotMatch:
-    iny 
-    dex   
-    cpx #$00
-    bne @interactLoop 
-@interactLoopEnd:
     rts 
 Interact:
     ;check if there is something infront of the player that they can interact with
@@ -1752,11 +1652,6 @@ StartingPosLo:
 StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
-RoomInteractLo:
-    .byte <JamesRoomInteract
-RoomInteractHi:
-    .byte >JamesRoomInteract
-
 RoomBasedEventsLo:
     .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
 RoomBasedEventsHi:
@@ -1862,20 +1757,6 @@ Outside1StartPos:
     .byte $80,$80
 Outside2StartPos:
     .byte $80,$80
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;   Interact Tables
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; James Room
-JamesRoomInteract:
-    .byte $02       ; count
-    .byte $80, $80  ; location of the interactable object
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
