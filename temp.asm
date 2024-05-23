@@ -33,7 +33,6 @@
     temp1:          .res 1
     temp2:          .res 1
 
-    bathroomFlag:   .res 1  ; this is so dumb but idc right now just bear with me
     flag1:        .res 1    ; bits: X - X - X - X - X - X - NMI Flag - Lag Frame Flag
 
         ;; should I even have this? or should I keep if scott is active with scott?
@@ -80,7 +79,6 @@
     SPRITE_RAM            = $0200
     playerXpos            = $0207       ; sprite 1 x pos
     playerTile            = $0205
-    playerAtt             = $0206
     playerYpos            = $0204       ; sprite 1 y pos
 
     timerSpriteYpos       = $0208
@@ -143,8 +141,6 @@
     aButtonTestAtt          = $0236
     aButtonTestXpos         = $0237
 
-    bathroomToiletSpriteStart = $0238
-
 
 .segment "CODE"
 
@@ -163,7 +159,7 @@ spriteLoop:
     lda sprites, X
     sta SPRITE_RAM, X
     inx
-    cpx #$34
+    cpx #$30
     bne spriteLoop
     rts
 
@@ -1003,42 +999,6 @@ DoAction:
     pha  
     rts 
 
-BathroomBasedEvents:
-    ; this is so wrong but i will deal. im making the bathroom in charge of the text. and then turn it off. which the sprites should be in charge of themselves
-        ; but that would require a lot of code to set up and thats for another time. simple and clean right now
-
-            ; when you walk away
-                ; you don't hear me say
-                    ; please
-                        ; oh baby
-                            ; don't go
-    lda bathroomFlag
-    cmp #$00
-    beq @BathroomBasedEventsDone
-    cmp #$01
-    beq @BathroomRemoveText
-    sec 
-    sbc #$01
-    sta bathroomFlag
-    jmp @BathroomBasedEventsDone
-
-@BathroomRemoveText:
-    ldy #$00
-    sty bathroomFlag
-    ldx #$00
-    lda #$FE
-
-@BathroomLoopStart:
-    cpx #$28
-    beq @BathroomBasedEventsDone
-    sta bathroomToiletSpriteStart, y
-    iny 
-    inx 
-    jmp @BathroomLoopStart
-
-@BathroomBasedEventsDone:
-    rts 
-
 DoNothing: 
     rts 
 
@@ -1071,40 +1031,9 @@ StandingLogic:
     cmp #$10
     sta playerAnimationCounter          
     bne @ControllerChecking          ; not updating sprite
-  ;  lda playerTile                   ; flipping between sprites 0 and 1 for now
-  ;  eor #%00000001
-  ;  sta playerTile
-
-  ; ok using some placeholder bs to make it more complex and show facing angle
-    ; i am under the assumption that we can just use whatever register
-   ; lda playerState
-   ; and #$03            ; isolates facing angle
-
-    ; ok this is a really bad way to do this
-        ; BUT
-    ; I think that it doesn't fucking matter. cause like. i will have to redo all this shit when i have actual
-        ; animation cycles. so who cares. lets get it barebones and gogogo
-    
-    ; i don't even need the facing angle. all i care about is changing the first 4 bits from 1 to 2 or 2 to 1
-        ; based on how the tile map is right now
-        ; should I have code that is hyper dependant on the layout of the tilemap? 
-            ; probably not but again i'll fix it later
-    lda playerTile
-
-    eor #%00110000
+    lda playerTile                   ; flipping between sprites 0 and 1 for now
+    eor #%00000001
     sta playerTile
-   ; and #$F0
-    ;cmp #$10
-    ;beq @changeItToTwo
-    ;lda playerTile
-    ;sec 
-    ;sbc #$10
-    ;jmp @ControllerChecking
-
-;@changeItToTwo:
-   ; lda playerTile
-   ; clc 
-   ; adc #$01
 
 @ControllerChecking:                    ; check input
     lda controller1Pressed
@@ -1124,7 +1053,7 @@ StandingLogic:
     jmp @DoneStanding
 @StandingAPressed:
     jsr StandingAPressedTest
-    jmp @DoneStanding
+
     ;jsr Interact   ; might be this call down the road. right now just making sure i can press A while standing and something happens
 @StandingUpPressed:
     lda #%01000010
@@ -1144,9 +1073,6 @@ StandingLogic:
 @StandingLeftPressed:
     lda #%01000001
     sta playerState
-    lda playerAtt
-    and #%10111111
-    sta playerAtt
     jsr WalkingLogicStart
                                   ; standing animation sprite update
 @DoneStanding:        
@@ -1155,39 +1081,9 @@ StandingLogic:
 StandingStateStart:
     lda #$00  
     sta playerAnimationCounter
-   ; lda #$00                        ; first sprite of standing animation (obvi temp idk what ima do for animation but make it bad at first tand then better lets goooo)
-    
-    
-    lda playerState
-    and #$03        ; isolate facing angle
-    cmp #$00
-    bne @notFacingDown2
-    lda #$10
+    lda #$00                        ; first sprite of standing animation (obvi temp idk what ima do for animation but make it bad at first tand then better lets goooo)
     sta playerTile
-    jmp @DoneStandingStateStart
 
-@notFacingDown2:
-    cmp #$01
-    bne @notFacingLeft2
-    lda #$11
-    sta playerTile
-    jmp @DoneStandingStateStart
-
-@notFacingLeft2:
-    cmp #$02
-    bne @notFacingUp2
-    lda #$12
-    sta playerTile
-    jmp @DoneStandingStateStart
-
-@notFacingUp2:
-    lda #$11
-    sta playerTile
-    lda playerAtt
-    ora #%01000000
-    sta playerAtt
-
-@DoneStandingStateStart:
     rts 
 DrinkingLogic:
     rts 
@@ -1352,290 +1248,15 @@ StandingAPressedTest:
     sta aButtonTestTile
     lda #$90
     sta aButtonTestXpos
-    lda #$80
     sta aButtonTestYpos
     lda #$00
     sta aButtonTestAtt
 
 @aButtonTestInit:
-    
-
-    jsr CheckTileInFront
-    rts 
-
-CheckTileInFront:
-    ; i want to check the tile in front of the player to see if that tile contains something the player can interact with
-    ; so what do i need to do......
-    ; First i need to get the player's position and reduce it into a tile. so what... just remove the last 3 bits? 
-    ; where is the actual position? isn't it like 1 pixel above the sprite? 
-
-    ; lets yolo
-    ; lets grab players pos, adjust to reflect where the sprite is and remove last 3 bits.
-    ; just store into temp1 and temp2 for now
-
-    
-
-    lda playerYpos
-    clc 
-    adc #$01
-    and #$F8
-    sta temp2   ; this gets the player y pos, adjusts cause its 1 pixel higher than the sprite, then clears the last 3 digits. 
-                    ; i will have to change this cause it will def be weird when trying to interact with something either slightly above or below idk which but one of them for sure
-    lda playerXpos
-    
-    
-
-    and #$F8            ; don't need to adjust y? wait i only need to adjust y
-    sta temp1
-
-; this is taking player facing direction into account. so ima store the value as one tile over in the direction the player is facing
-        ; again this will have to be updated if i don't AND the last 3 bits to 0 so that i can interact with things inbetween tiles
-        ; Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
-    lda playerState
-    and #$03
-    cmp #$00        ; facing down
-    bne @notFacingDown
-    lda #$08
-    clc 
-    adc temp2
-    sta temp2
-    jmp @doneWithFacing
-
-@notFacingDown:
-    cmp #$01        ; facing left
-    bne @notFacingLeft
-    lda temp1
-    sec 
-    sbc #$08
-    sta temp1
-    jmp @doneWithFacing
-
-@notFacingLeft:
-    cmp #$02        ; facing up
-    bne @notFacingUp
-    lda temp2
-    sec 
-    sbc #$08
-    sta temp2
-    jmp @doneWithFacing
-
-@notFacingUp:
-    lda #$08        ; facing right
-    clc 
-    adc temp1
-    sta temp1
-
-@doneWithFacing:
-    ldy roomIndex
-    lda RoomInteractLo, y
-    sta pointerLo
-    lda RoomInteractHi, y
-    sta pointerHi
-    ldy #$00            ; y is now the loop counter thing
-    lda (pointerLo), y  ; this grabs the count and can be used at the loop count limit
-    tax                 ; so lets put it in x
-
-
-@interactLoop:
-    iny         
-    lda (pointerLo), y  ; this is the x pos of the interactable obj
-    cmp temp1
-    bne @interactLoopXNotMatch
-    iny 
-    lda (pointerLo), y 
-    cmp temp2
-    bne @interactLoopYNotMatch
-        ; if we here then both x and y pos match
-        ; this is where we would call the code for that specific obj. probably store the pointers in the location table
-    
-    ; interactable object found in front of the player. gets the hi and then low - 1 byte of that objects interact function
-    ; pushes it on to the stack and then rts will go to that function 
-    iny 
-    lda (pointerLo), y
-    pha 
-    iny  
-    lda (pointerLo), y
-    pha 
-    jmp @interactLoopEnd
-    ; ok so temp1 is player x pos rounded to nearest tile, temp2 is adjusted then rounded to nearest tile
-@interactLoopXNotMatch:
-    iny 
-@interactLoopYNotMatch:
-    iny 
-    iny   
-    dex   
-    cpx #$00
-    bne @interactLoop 
-@interactLoopEnd:
-    rts 
-
-
-InteractTestFunction1:
     lda aButtonTestAtt
-    eor #%10000000
+    eor #%00100000
     sta aButtonTestAtt
     rts 
-
-InteractTestFunction2:
-    lda #$02
-    sta roomIndex
-    jsr LoadRoom
-    rts 
-
-ToiletInteract:
-    ; so like how the fuck do i have text or something flash on the screen and then go away? cause like how do i keep track of how long its on the 
-        ; screen and when it knows to go away?
-        ; couple ideas
-            ; iterate through sprites somehow and do any code that pertains to them. like scott moving or something
-            ; have the room be in charge? cause i think i go through the room code?
-
-    lda bathroomFlag
-    cmp #$00
-    bne @ToiletInteractDone  ; text is still there. i don't want to reset the text timer cause idc
-    jsr ToiletInteractSetSprites
-
-@ToiletInteractDone:
-    rts 
-
-    
-
-ToiletInteractSetSprites:
-    lda #$3C
-    sta bathroomFlag
-
-    ldy #$00
-
-    lda #$10                                ; G
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$88
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; O
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$90
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; P        
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D9
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; I
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D2
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; S
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DC
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$B0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; S
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DC
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$B8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                                ; G
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$90
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; I
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D2
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$98                            
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; R
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DB
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; L
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D5
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A8
-    sta bathroomToiletSpriteStart, y  
-    
-    rts 
-
 Interact:
     ;check if there is something infront of the player that they can interact with
     ; what are ways we can do this?
@@ -2031,15 +1652,10 @@ StartingPosLo:
 StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
-RoomInteractLo:
-    .byte <JamesRoomInteract, <LivingRoomInteract, <ScottRoomInteract, <BathroomInteract
-RoomInteractHi:
-    .byte >JamesRoomInteract, >LivingRoomInteract, >ScottRoomInteract, >BathroomInteract
-
 RoomBasedEventsLo:
-    .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <BathroomBasedEvents - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
+    .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
 RoomBasedEventsHi:
-    .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >BathroomBasedEvents, >DoNothing, >DoNothing, >DoNothing, >DoNothing
+    .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing, >DoNothing
 
 RoomLoadingLo:
     .byte <JamesRoomLoad - 1, <LivingRoomLoad - 1, <ScottRoomLoad - 1, <BathRoomLoad - 1, <BalconyLoad - 1
@@ -2141,31 +1757,6 @@ Outside1StartPos:
     .byte $80,$80
 Outside2StartPos:
     .byte $80,$80
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;   Interact Tables
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; James Room
-; x, y, hi, low - 1
-JamesRoomInteract:
-    .byte $02       ; count
-    .byte $80, $80, >InteractTestFunction1, <InteractTestFunction1 - 1  ; location of the interactable object
-    .byte $A0, $88, >InteractTestFunction2, <InteractTestFunction2 - 1
-
-LivingRoomInteract:
-    .byte $00
-
-ScottRoomInteract:
-    .byte $00
-
-BathroomInteract:
-    .byte $01
-    .byte $90, $30, >ToiletInteract, <ToiletInteract - 1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -2365,7 +1956,7 @@ BathroomBackground:     ; roomIndex: 3
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$00,$00,$00,$00,$00,$00,$00,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
-    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$30,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
+    .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$00,$24,$24,$24,$24,$24,$24,$24,$24,$24
@@ -2526,7 +2117,7 @@ StoreBackground:        ; roomIndex: 5
 
 sprites: ;  y  tile  att  x
     .byte $FE, $fe, $fe, $fe    ; 0 sprite off the screen (maybe status bar or something)
-    .byte $80, $10, $00, $80 ; YCoord, tile number, attr, XCoord
+    .byte $80, $00, $00, $80 ; YCoord, tile number, attr, XCoord
     .byte $10, $00, $00, $10        ; 1's digit of timer sprite
     .byte $10, $00, $00, $08        ; 10s digit of timer sprite
     .byte $20, $00, $00, $10        ; 1s digit of timer2
@@ -2538,7 +2129,6 @@ sprites: ;  y  tile  att  x
     .byte $20, $09, $00, $68        ; score 1000s
     .byte $20, $00, $00, $60        ; score 10000s
 
-    .byte $88, $00, $00, $A0
     .byte $80, $00, %00100000, $80        ; scott
 
         ;; weird idea. what if i just like yolo the sprites. like. is this what a buffer is? cause ive understood the conecpt but never the freaking impelmentation. 
@@ -2659,7 +2249,7 @@ BathroomHitTable:
     .byte %00000000, %00000000, %00000000, %00000000
     .byte %00000000, %00000000, %00000000, %00000000
     .byte %00000011, %00000011, %11111111, %11000000
-    .byte %00000010, %00000010, %00100010, %01000000
+    .byte %00000010, %00000010, %00000010, %01000000
     .byte %00000010, %00000010, %00000010, %01000000
     .byte %00000010, %00000010, %00000010, %01000000
     .byte %00000010, %00000010, %00000010, %01000000
