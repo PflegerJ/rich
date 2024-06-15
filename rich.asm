@@ -62,6 +62,8 @@
     distanceTestResult:       .res 2
     scoreIncrementOnes: .res 1
     scoreIncrementTens: .res 1
+    beerCount:                   .res 1      ; first half is cigs, 2nd beer bits: 0123 | 4567
+    cigCount:                   .res 1
 
     PPU_CTRL_REG1         = $2000
     PPU_CTRL_REG2         = $2001
@@ -1811,6 +1813,39 @@ Outside1Load:
     rts 
 
 
+
+AddToInventory:
+    ; I'm going to make some random assumptions that might hold up but who knows
+    ; lets assume that the value we want to add is in y, and either 1 or 0 is in x
+    ; maybe lets assume the value we want to add is in temp1. cause i don't think you can add x to a
+    ; if x is 0, we are adding beer
+    ; if x is 1 we are adding cigs
+    ; im just using 2 seperate variables cause idk if i want to cap it at 15 and idc right now cause fuck everyting ima die alone
+    cpx #$00
+    bne @AddingCigs
+    lda beerCount
+    clc 
+    adc temp1
+    cmp beerCount
+    bcs @DoneAddingToInventory   ; the carry is set if what is in A is greater than the operand. i think
+        ; im just going to not add to inventory if it overflows cause i don't want to deal with it. 
+    sta beerCount
+    jmp @DoneAddingToInventory
+
+@AddingCigs:  
+    lda cigCount
+    clc 
+    adc temp1
+    bcs @DoneAddingToInventory
+    sta cigCount
+    
+@DoneAddingToInventory:
+    rts 
+
+SubtractFromInventory:
+ 
+@SubbingCigs:
+    rts 
 
 Random:
     rts
