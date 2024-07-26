@@ -19,6 +19,8 @@
     ;; Variables
     pointerLo:      .res 1  ; pointer variables are declared in RAM
     pointerHi:      .res 1  ; low byte first, high byte immediately after
+    gameObjectLo:   .res 1  ; pointer variables for storing the game objects in ram
+    gameObjectHi:   .res 1
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
    ; playerXpos:     .res 1  
    ; playerYpos:     .res 1
@@ -32,6 +34,10 @@
     
     temp1:          .res 1
     temp2:          .res 1
+     ; am i dumb or is this needed. like who fucking knows at this point. wait. other way is having tables 
+        ; its always fucking tables. 
+        ; should i just yolo table style first?
+    ; ok yoloing tables
 
     bathroomFlag:   .res 1  ; this is so dumb but idc right now just bear with me
     flag1:        .res 1    ; bits: X - X - X - X - X - X - NMI Flag - Lag Frame Flag
@@ -146,7 +152,27 @@
     aButtonTestXpos         = $0237
 
     bathroomToiletSpriteStart = $0238
+    
+    scottDataStartLo: .res 1
+    scottDataStartHi: .res 1
+    ;; Game Engine shit
+    spriteRamStart = $0300
+    objectMax = $20
+  ;  object_y_pos = spriteramstart + object_max*0
+   ; object_tile = spriteramstart +object_max*1
+   ; object_att = spriteramstart + object_max*2
+   ; object_x_pos = spriteramstart + object_max*3
+   ; object_script_lo = spriteramstart + object_max*4
+   ; object_script_hi = spriteramstart + object_max *5
+   ; object_var_1 = spriteramstart + object_max * 6
+   ; object_var_2 = spriteramstart + object_max * 7
+    
+    objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
 
+    firstFreeSlot:      .res 1
+    firstOccupiedSlot:  .res 1
+    lastOccupiedSlot:   .res 1
+    freeRAMStart = $04      ; linked list of Free RAM slots stored 0400 - 04FF?
 
 .segment "CODE"
 
@@ -1485,8 +1511,8 @@ InteractTestFunction2:
     rts 
 
 ToiletInteract:
-    ; so like how the fuck do i have text or something flash on the screen and then go away? cause like how do i keep track of how long its on the 
-        ; screen and when it knows to go away?
+    ; so like how the fuck do i have text or something flash on the screen and then go away? 
+    ; cause like how do i keep track of how long its on the screen and when it knows to go away?
         ; couple ideas
             ; iterate through sprites somehow and do any code that pertains to them. like scott moving or something
             ; have the room be in charge? cause i think i go through the room code?
@@ -1883,7 +1909,154 @@ SetPlayerPositionMultipleOptions:
     sta playerYpos 
     rts 
 
+; oh boy pray for me
+; im just yoloing. i made a new branch
+; ok so i have 4 temp vars now. im not sure how to like. make this the best obvi but make it at all
+; i have to set all the positioning and variables and tile and att and script mem address
+; each game object has 8 bytes to it right now. with 4 temp vars. idk if i need 4 more temp vars so i can just temp1-8 or what is best
+; that is what makes sense to me at the moment, because i read somewhere you shouldn't pass variables on the stack so like how else
+; am i supposed to do it unless i write 2 functions that do 4 things each
+; if i run out of memory i will adjust. lets get our hands dirty 
 
+; learn by fucking doing my girl
+
+; ok here is the plan. we are using tables big surprise. so what we are going to do is assume that we have either
+; fuck
+; ok option 1 is assume pointerLo and pointerHi have been set before the call. that makes the most sense to me?
+; option 2 is that hi and lo address is stored in register or temp1 and temp2
+; buts lets roll with option 1 and see why it doesn't work instead of decision paralysis
+
+
+
+; this assumes that pointerLo has already been set
+CreateGameObject:
+    ; hi and low are set. we just need to get the 8 values stored in the table they are pointing to.
+    ; set them using the object_blah_blah_blah and do the linked list shit. so do we need to check for empty list each time?
+    ldy #$00    ; index set to 0
+    ; it might be better to jsut not loop. because i need one of the registers to use as the offset for storing the data into spriteram
+    ; th8is is fucking wrong and dumb and im dumb 
+
+    ; ok another yolo
+    ; we have gameObjLo and Hi. Lo will be pointing to the start of the next free slot of ram.
+    ; Hi will always be $03 cause im just using range of 0300-03FF
+    ; this is bad and basic but i have to do something and it sorta makes sense on how to do it. 
+    ; so while i'm doing this i'll probably figure out the why its not done this way
+
+
+    ; just thought of a major issue
+    ; what if i have 10 game objects. and the 5th needs to be deleted? right now that would not work... fuck thats why you have a linked list. but like....
+    ; hmmmmmmmmm
+
+
+    ; so we assuming the gameObjectLo is already pointing to the correct place
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny 
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny   
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda (pointerLo), y 
+    sta (gameObjectLo), y 
+    iny  
+
+    lda gameObjectLo
+    clc 
+    adc #$08
+    sta gameObjectLo
+
+    rts 
+
+
+
+
+; ok i took way too long of a break
+; i think i need to restart this game engine shit from scratch
+
+; ok creating a gameobj in ram
+; i need to take the data from sometable in rom and put it in ram
+; i need to keep track of where im putting the next game object
+; i need to keep track of what blocks in obj ram are being used to iterate through
+
+
+; this is assuming I have the pointer pointing to where I'm going to place the data
+; and assuming I have the pointer pointing to where the data is im going to store
+
+
+; this function should run at start up. and should set up all the free slots in objectRAM to point at the next slot so
+; when i need to put an object in RAM i just take the first free slot in this linked list and have next free slot point to the first slot's NEXT
+
+; so each object in this linked list has 2 things
+    ; the index of where the object starts in ram 00 - FF?
+    ; the index of next
+
+; picking random place to put this shit? 0400 work?
+; I have a FreeRamFirst pointer?
+; and I have freeRAMStart defined as 04
+InitializeGameObjectRam:
+
+    ; spriteRamStart = $0300
+    ; objectMax = $20  
+    ; objectNext
+    ; firstFreeSlot:      .res 1
+    ; firstOccupiedSlot:  .res 1
+    ; lastOccupiedSlot:   .res 1
+
+; ok so we are going back to the old method i first read about using the offset stuff whatever god im so fucking hungry i can't think
+; 
+; 
+    
+    ldy #$00
+    lda #$01
+    sty firstFreeSlot   ; setting firstFreeSlot as 0 because that is the first free slot at startup. 
+    ; then lets do the loop and fill each objectNext value to point at the next object
+    ; if an obj points to objectMax then it points to null
+
+    ; objectMax is the same thing as Null for this linkedList!!!!
+    ; do a loop setting each objectNext to equal 1 more than that object's num until we reach the end which is max_objects or whatever which is like 20 right now. so pointing to null is pointing to maxObjects + 1 since there are no negative numbers.
+
+@StartInitGameObjRamLoop:
+    ; we are going to store a at objectNext,y
+    ; so objectNext,0 is at $0300. It's "obj ID" is 0 or the offset. and will set its next as +1
+    sta objectNext,y 
+    clc                 ; incrementing a and y. so next loop we store 2 at objNext,1 all the way to storing 20 at objNext,19 but not really 19 whatever 19 is in hex
+    adc #$01
+    iny 
+    cmp #objectMax       ; if a is the same as objMax then we have reached the end? or do we need to do one more time to put 20 at slot 19? i think we need one more time
+    bcc @StartInitGameObjRamLoop
+
+    sta objectNext,y    ; this is storing the value ObjectMax in the last object's next value which is the same as it pointing to null and represents the end of available memory
+
+    ; I also need to set firstOccupiedSlot and lastOccupiedSlot as objectMax (null) and that really should be it for init the game obj memory.
+    ; if this logic works then we gucci please logic be right
+
+    sta firstOccupiedSlot
+    sta lastOccupiedSlot
+    rts 
+
+ CreateGameObject2:
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -1939,6 +2112,7 @@ clearnametables:
     DEX 
     BNE :-
 
+    jsr InitializeGameObjectRam
     jsr loadpalettes
 
     jsr loadSprites
@@ -1947,6 +2121,23 @@ clearnametables:
     jsr loadbackground
 
 
+    ; setting DMA pointer
+
+        ; ok so lets try and initialize the spriteRam pointer
+ ;   lda spriteramstart
+   ; sta FirstFreeSlot      ; i think this is really stupid and wrong
+   ; lda #$00
+    ;sta NextFreeSlot
+
+    ; so lets set the hi byte of the pointer to $03, and then the first and next slot to $00
+    ; that should make it so when we add to next, it will start at address $0300, and then will be pointing at $0308, while first still points at $00, tbh idk if we need a first then... im kind of confused on why
+    lda #<spriteRamStart
+    sta gameObjectLo
+    lda #>spriteRamStart
+    sta gameObjectHi
+
+
+;asdfasdf
     CLI 
     LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
     STA PPU_CTRL_REG1
@@ -1972,6 +2163,26 @@ Main:
     jsr Timer2
     jsr ReadController1
     jsr PlayerLogic
+
+
+
+   ; ldy #$00
+   ; lda DefaultObjectStartLo, y
+   ; sta pointerLo
+   ; lda DefaultObjectStartHi, y
+   ; sta pointerHi
+   ; jsr CreateGameObject
+
+    
+   ; ldy #$00
+   ; lda DefaultObjectStartLo, y
+   ; sta pointerLo
+  ;  lda DefaultObjectStartHi, y
+  ;  sta pointerHi
+   ; jsr CreateGameObject
+
+
+
     ldx #$02
 
     ;lda controller1
@@ -2080,6 +2291,11 @@ RoomLoadingLo:
     .byte <JamesRoomLoad - 1, <LivingRoomLoad - 1, <ScottRoomLoad - 1, <BathRoomLoad - 1, <BalconyLoad - 1
 RoomLoadingHi:
     .byte >JamesRoomLoad, >LivingRoomLoad, >ScottRoomLoad, >BathRoomLoad, >BalconyLoad
+
+DefaultObjectStartLo:
+    .byte <ScottStartingData
+DefaultObjectStartHi:
+    .byte >ScottStartingData
 
 StandingAnimation:
     .byte $00, $00, $00, $00
@@ -2201,6 +2417,27 @@ ScottRoomInteract:
 BathroomInteract:
     .byte $01
     .byte $90, $30, >ToiletInteract, <ToiletInteract - 1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;   Game Object Data
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ScottStartingData:
+    .byte $55       ; y pos
+    .byte $32       ; tile 
+    .byte $00       ; att
+    .byte $88       ; x pos
+    .byte <ScottLogic       ; code lo
+    .byte >ScottLogic       ; code hi
+    .byte $60       ; var 1
+    .byte $70       ; var2
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
