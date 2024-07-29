@@ -2055,7 +2055,102 @@ InitializeGameObjectRam:
     sta lastOccupiedSlot
     rts 
 
+
+
+; This logic should work for adding. I am now working on deleting which may cause some bugs here when the list gets populated, then deleted and then repopulated and then deleted.
+; im mostly concered with the list getting back to empty and making sure there are no breaks in the linkedlist 
+
+
+; this is purely for getting the memory management down. I'm not caring about any variables or pointers or whatever. we are just going to call this along side deletegameobject
+; to make sure that shit is added and deleted and then properly iterated through. 
+
+; also not sure about trying to add to a full list or adding last possible element
  CreateGameObject2:
+    lda firstFreeSlot
+    cmp #objectMax
+    beq @DoneAddingNewElement   ; if firstFreeSlot is pointing to objectMax then the list is full and we can't add more objects to it.
+    ; i feel like to make a general function. we need to check if the first and the last both equal 0? or each other?
+    ; wait thats dumb firstOccupiedSlot would be null thats all we have to check
+
+    ; checking if firstOccupiedSlot is equal to ObjectMax to see if RAM is empty
+
+    ; might also need to check if first and last are equal to see if list is empty or full?
+    lda firstOccupiedSlot
+    cmp #objectMax
+    beq @TheCurrentListIsEmpty           ; not sure if i should branch if equal or if not equal yet. lets see what things have to happen and what order would make more sense
+
+    ldx lastOccupiedSlot                 ; this is setting up offsets for adding nth element
+    lda firstFreeSlot
+    sta objectNext,x                        ; this is storing the newely added element's slot as the next value of the previous end of the list's next value
+    jmp @TimeToAddNewElement
+
+@TheCurrentListIsEmpty:
+    lda firstFreeSlot
+    sta firstOccupiedSlot 
+    ; this is assuming we will use y as the offset to add all the data to the the other variable tables  
+    ; this should work for both adding 1st and adding nth element. only difference is how to load x and y registers since lastOccupiedSlot is null when empty
+
+@TimeToAddNewElement:
+    ldy firstFreeSlot  
+    lda objectNext,y        ; this is storing the current FirstFreeSlot's next value as the new firstFreeSlot
+    sta firstFreeSlot
+
+    lda #objectMax
+    sta objectNext,y        ; this is storing null in the slot we are adding the new element to. because we always add to the end so it should point to null
+      
+    sty lastOccupiedSlot    ; this is setting the lastOccupiedSlot as firstFreeSlot cause thats where we put the newely added element
+
+@DoneAddingNewElement:    
+    rts 
+
+
+; so for deleting it should be maybe easy? what we need is the object number we are deleting. which is just its slot number so it should be easy. i think the tricky part is connecting
+; the list back together. cause 1 -> 2 -> 3. if we are deleting 2 we need 1 to point to 3. which means we might have to walk down the list until we reach 1 before 2. so O(n) instead of 0(1) of inserting
+
+
+
+; THIS ASSUMES X REG already has the slot we are deleting
+DeleteGameObject:
+
+    ; WE ARE ASSUMING X is the game object we are deleting?
+    ; so what are the scenarios?
+
+    ; deleting first element (n) (order probably wrong)
+    ; also didn't consider if deleting object is before or after the current FOS
+        ; FOS -> FOS.next
+        ; if n < FFS: FFS -> FOS
+        ; FOS.next -> FFS
+
+    ; n = FirstOccupiedSlot
+
+    ; x reg is going to hold the slot we are deleting
+        ;ldx firstOccupiedSlot       ; this could also be n instead which it probably should be
+    cpx firstOccupiedSlot
+    bne @DeletingMiddleOrLast
+    ;; THIS IS FOR DELETING FIRST OBJECT IN LIST
+@DeletingFirstElementInList:                                                                                                     
+    ldy firstFreeSlot
+
+    lda objectNext,x        ; FOS -> FOS.next
+    sta firstOccupiedSlot
+    cpx firstFreeSlot
+    bcs @FFSisLessThanDeletedSlot
+    
+    stx firstFreeSlot       ; if n < FFS: FFS -> FOS   
+    tya 
+    sta objectNext,x        ; FOS.next -> FFS
+    jmp @DoneDeleting
+
+@FFSisLessThanDeletedSlot:
+    lda objectNext,y        ; FOS.next -> FFS.next
+    sta objectNext,x 
+
+    txa 
+    sta objectNext,y         ; FFS.next -> FOS
+    jmp @DoneDeleting
+
+@DeletingMiddleOrLast:
+@DoneDeleting:
     rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2113,6 +2208,21 @@ clearnametables:
     BNE :-
 
     jsr InitializeGameObjectRam
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+
+    ldx #00
+    jsr DeleteGameObject
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    ldx #01
+    jsr DeleteGameObject
     jsr loadpalettes
 
     jsr loadSprites
