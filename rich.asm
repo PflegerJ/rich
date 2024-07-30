@@ -2134,14 +2134,14 @@ DeleteGameObject:
     lda objectNext,x        ; FOS -> FOS.next
     sta firstOccupiedSlot
     cpx firstFreeSlot
-    bcs @FFSisLessThanDeletedSlot
+    bcs @TargetGreaterThanFSS
     
     stx firstFreeSlot       ; if n < FFS: FFS -> FOS   
     tya 
     sta objectNext,x        ; FOS.next -> FFS
     jmp @DoneDeleting
 
-@FFSisLessThanDeletedSlot:
+@TargetGreaterThanFSS:
     lda objectNext,y        ; FOS.next -> FFS.next
     sta objectNext,x 
 
@@ -2150,6 +2150,80 @@ DeleteGameObject:
     jmp @DoneDeleting
 
 @DeletingMiddleOrLast:
+    ; ok so we need to iterate through the list and set n.previous.next to n.next
+    ; we also need to add this slot into the free slot list
+    ; so we need to set up prev which we will use temp? could also possibly use a reg but i think thats worse
+    ; we also can assume we are not deleting the first element. so we can start looking at FOS.next and use FOS as prev
+    
+    stx temp1               ; temp1 is target
+    ldx firstOccupiedSlot   ; setting x to be prev
+
+
+    ; i think i can move this down into the loop and remove the bottom ldy since its the same thing but i'll do that after it works
+    ldy objectNext,x        ; setting y to be current ( we start 1 element in since we KNOW we aren't deleting the first element )                       ; 
+@WalkingThroughElementListStart:
+    ; first we must compare current to target    
+    tya 
+    cmp temp1
+    beq @TargetFound
+
+    ; target is not found lets iterate to next
+    tax 
+    ldy objectNext,x
+    jmp @WalkingThroughElementListStart 
+@TargetFound:
+    ; i need to move prev.next to current.next
+    lda objectNext,y   ; getting curr.next
+    sta objectNext,x    ; storing curr.next in prev.next
+
+    cmp #objectMax
+    beq @UpdateLastOccupiedSlot
+    jmp @UpdateFreeSlotList
+
+@UpdateLastOccupiedSlot:
+    stx lastOccupiedSlot
+    ; i also need to add the deleted slot into the freeSlot list and update firstFreeSlot if applicable
+
+@UpdateFreeSlotList:
+    ; so honestly i shouldn't keep track of keeping FFS lower for literally no reason
+    ; so really all I have to do when I delete something, is just add it to the front of FFS
+
+    ; so i make the target point to FFS
+    ; and then set FSS as the target
+    lda firstFreeSlot
+    sta objectNext,y    ; setting the target.next to point to the old FFS     
+    sty firstFreeSlot
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; SAVING THIS INCASE I FUCK IT UP TRYING THE OTHER IMPLEMENTATION
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+    ; target < FFS
+    ; first we need to say target.next points to FFS
+        ; y is current and is the target since we have found target
+        ; and a might be target but lets just do each piece isolated and then work out the order and handling of registers
+   ; lda firstFreeSlot
+    ;cmp temp1           ; we need to branch depending on if target is before or after the current FFS
+   ; bcc @FSSLessThanTarget
+   ; sta objectNext,y
+   ; sty firstFreeSlot     ; then we can move FFS to target and that should be it
+   ; jmp @DoneDeleting
+
+;@FSSLessThanTarget:
+    ; target > FFS
+
+    ; could maybe just do tax since we lda firstFreeSlot and wouldn't have changed it by this point
+  ;  ldx firstFreeSlot   ; need to use FFS as an offset to get it's next so we have to use y or x. and since y is also target its already stored in temp1 if we need it
+                        ; wait maybe its better to use x. since we might not need to care about prev if we already set up those pointers. 
+  ;  lda objectNext,x    ; a now has FFS.next
+   ; sta objectNext,y    ; storing old FFS.next as target.next
+   ; tya 
+   ; sta objectNext,x    ; storing target as new FFS.next
+    ; I also need to update lastOccupiedSlot if applicable
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @DoneDeleting:
     rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2216,13 +2290,37 @@ clearnametables:
     jsr CreateGameObject2
     jsr CreateGameObject2
 
-    ldx #00
+    ldx #06
     jsr DeleteGameObject
     jsr CreateGameObject2
     jsr CreateGameObject2
     jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    jsr CreateGameObject2
+    ldx #05
+    jsr DeleteGameObject
     ldx #01
     jsr DeleteGameObject
+    ldx #00
+    jsr DeleteGameObject
+    ldx #03
+    jsr DeleteGameObject
+    ldx #04
+    jsr DeleteGameObject
+    ldx #07
+    jsr DeleteGameObject
+    ldx #06
+    jsr DeleteGameObject
+    ldx #08
+    jsr DeleteGameObject
+    ldx #09
+    jsr DeleteGameObject
+    ldx #$0A 
+    jsr DeleteGameObject
+
     jsr loadpalettes
 
     jsr loadSprites
