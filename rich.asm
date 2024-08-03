@@ -153,6 +153,7 @@
 
     bathroomToiletSpriteStart = $0238
     
+    SPRITE_RAM_START        = $0240
     scottDataStartLo: .res 1
     scottDataStartHi: .res 1
     ;; Game Engine shit
@@ -168,6 +169,10 @@
    ; object_var_2 = spriteramstart + object_max * 7
     
     objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
+    objectXPos = spriteRamStart + objectMax * 1
+    objectYPos = spriteRamStart + objectMax * 2
+    objectTile = spriteRamStart + objectMax * 3
+    objectAtt = spriteRamStart + objectMax * 4
 
     firstFreeSlot:      .res 1
     firstOccupiedSlot:  .res 1
@@ -1526,6 +1531,13 @@ ToiletInteract:
     rts 
 
     
+.word ToiletLetters1
+.word ToiletLetters2
+ToiletLetters1: 
+    ;      y  tile  att   x    y   tile att   x
+    .byte $10, $D0, $00, $80 
+ToiletLetters2:
+    .byte $10, $D8, $00, $90
 
 ToiletInteractSetSprites:
     lda #$3C
@@ -2065,6 +2077,12 @@ InitializeGameObjectRam:
 ; to make sure that shit is added and deleted and then properly iterated through. 
 
 ; also not sure about trying to add to a full list or adding last possible element
+
+
+
+;; ok now its time to think about adding the actual game object data to the other variables. the main thing is I need to know what my offset is which is what the whole linked
+        ; list bullshit is about. but after i figure out where I'm putting it and make sure all the pointers are pointing, I can use that slot as offset to just blast through
+        ; the table that some pointer is pointing at and move it to ram.
  CreateGameObject2:
     lda firstFreeSlot
     cmp #objectMax
@@ -2075,9 +2093,33 @@ InitializeGameObjectRam:
     ; checking if firstOccupiedSlot is equal to ObjectMax to see if RAM is empty
 
     ; might also need to check if first and last are equal to see if list is empty or full?
+
+    ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
+    ; lets just do it here
+    ; we doing dumb shit. the order before actually setting all the variables
+    ; y pos | tile | att | x pos
+    ldx firstFreeSlot           ; this is the offset for putting the data
+    ldy #$00                    ; this is the offset of the data table we grabbing the data from
+    lda (pointerLo),y 
+    sta objectYPos,x 
+    iny 
+    lda (pointerLo),y 
+    sta objectTile,x 
+    iny 
+    lda (pointerLo),y 
+    sta objectAtt,x 
+    iny 
+    lda (pointerLo),y 
+    sta objectXPos,x 
+    ; I THINK THIS IS RIGHT? just taking fromt table and placing into var.
+
+
+
     lda firstOccupiedSlot
     cmp #objectMax
     beq @TheCurrentListIsEmpty           ; not sure if i should branch if equal or if not equal yet. lets see what things have to happen and what order would make more sense
+
+
 
     ldx lastOccupiedSlot                 ; this is setting up offsets for adding nth element
     lda firstFreeSlot
@@ -2091,6 +2133,11 @@ InitializeGameObjectRam:
     ; this should work for both adding 1st and adding nth element. only difference is how to load x and y registers since lastOccupiedSlot is null when empty
 
 @TimeToAddNewElement:
+    ; before we use y register. we should add all the data from the pointer to the variables. cause we haven't needed to move any pointers around
+        ; x is lastOccupiedSlot but we can re ldx to get that value back. and we are placing in firstFreeSlot. so we can do all the adding using y or x to offset the
+            ; pointer for the data. then reset x and y for doing the pointer moving to keep the lists working
+    
+
     ldy firstFreeSlot  
     lda objectNext,y        ; this is storing the current FirstFreeSlot's next value as the new firstFreeSlot
     sta firstFreeSlot
@@ -2226,6 +2273,37 @@ DeleteGameObject:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @DoneDeleting:
     rts 
+
+
+; so. i need to take into account where to start. cause things like timers and shit. unless i load those into ram but idk if i need to. i think they are their own thing?
+CopyObjectRamToSpriteRam:
+    
+    ldx #$00
+    ldy firstOccupiedSlot
+
+@SpriteCopyLoopStart:    
+    cpy #objectMax
+    beq @DoneCopyingSpriteData
+
+    lda objectYPos,y
+    sta SPRITE_RAM_START,x
+    inx 
+    lda objectTile,y 
+    sta SPRITE_RAM_START,x 
+    inx 
+    lda objectAtt,y 
+    sta SPRITE_RAM_START,x
+    inx 
+    lda objectXPos,y 
+    sta SPRITE_RAM_START,x
+    inx 
+    
+    lda objectNext,y 
+    tay 
+    jmp @SpriteCopyLoopStart
+@DoneCopyingSpriteData:
+    rts 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -2282,44 +2360,8 @@ clearnametables:
     BNE :-
 
     jsr InitializeGameObjectRam
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-
-    ldx #06
-    jsr DeleteGameObject
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    jsr CreateGameObject2
-    ldx #05
-    jsr DeleteGameObject
-    ldx #01
-    jsr DeleteGameObject
-    ldx #00
-    jsr DeleteGameObject
-    ldx #03
-    jsr DeleteGameObject
-    ldx #04
-    jsr DeleteGameObject
-    ldx #07
-    jsr DeleteGameObject
-    ldx #06
-    jsr DeleteGameObject
-    ldx #08
-    jsr DeleteGameObject
-    ldx #09
-    jsr DeleteGameObject
-    ldx #$0A 
-    jsr DeleteGameObject
+    
+    
 
     jsr loadpalettes
 
@@ -2421,6 +2463,17 @@ rightNotPressed:
     jsr DoAction
 
     jsr ControllerLogic
+
+  ;  lda #<ToiletLetters1
+   ; sta pointerLo
+    ;lda #>ToiletLetters1
+    ;sta pointerHi
+    ;jsr CreateGameObject2
+
+    
+
+    jsr CopyObjectRamToSpriteRam
+
     lda flag1           ; sets lag frame flag to 0: means game logic done and can update spriets on next vblank
     and #%11111110  
     sta flag1
@@ -2634,6 +2687,7 @@ BathroomInteract:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+.word ScottStartingData
 ScottStartingData:
     .byte $55       ; y pos
     .byte $32       ; tile 
