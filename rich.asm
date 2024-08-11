@@ -153,12 +153,13 @@
 
     bathroomToiletSpriteStart = $0238
     
-    SPRITE_RAM_START        = $0240
+    SPRITE_RAM_START        = $0240  ; which sprite ram start is this? god damn it jabes, this is where i put the sprite data from game objects
     scottDataStartLo: .res 1
     scottDataStartHi: .res 1
     ;; Game Engine shit
-    spriteRamStart = $0300
-    objectMax = $20
+    spriteRamStart = $0300  ; what the fuck is this naming convention? this is where i store game object data
+    objectMax = $10
+    variableCount = $8
   ;  object_y_pos = spriteramstart + object_max*0
    ; object_tile = spriteramstart +object_max*1
    ; object_att = spriteramstart + object_max*2
@@ -168,11 +169,21 @@
    ; object_var_1 = spriteramstart + object_max * 6
    ; object_var_2 = spriteramstart + object_max * 7
     
+    ; in the future will I need all these vars? 
+    ; i guess will draw functions help reduce the vars needed? or maybe i can just assume Att is 00 or something
+        ; but also each sprite won't take up a game object slot.
+
+
+    ; so part of the overhead of using this system of memory managment is each game object requires an additional variable. which limits how much data they can store
+        ; cause right now i can only have 1 var slot
     objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
     objectXPos = spriteRamStart + objectMax * 1
     objectYPos = spriteRamStart + objectMax * 2
     objectTile = spriteRamStart + objectMax * 3
     objectAtt = spriteRamStart + objectMax * 4
+    objectVar1 = spriteRamStart + objectMax* 5
+    objectHi = spriteRamStart + objectMax * 6
+    objectLo = spriteRamStart + objectMax * 7
 
     firstFreeSlot:      .res 1
     firstOccupiedSlot:  .res 1
@@ -1516,11 +1527,27 @@ InteractTestFunction2:
     rts 
 
 ToiletInteract:
-    ; so like how the fuck do i have text or something flash on the screen and then go away? 
-    ; cause like how do i keep track of how long its on the screen and when it knows to go away?
-        ; couple ideas
-            ; iterate through sprites somehow and do any code that pertains to them. like scott moving or something
-            ; have the room be in charge? cause i think i go through the room code?
+                                                                ; so like how the fuck do i have text or something flash on the screen and then go away? 
+                                                                ; cause like how do i keep track of how long its on the screen and when it knows to go away?
+                                                                    ; couple ideas
+                                                                        ; iterate through sprites somehow and do any code that pertains to them. like scott moving or something
+                                                                        ; have the room be in charge? cause i think i go through the room code?
+
+    ; so i figured this out ^^^^^^^^^^^^^^^^
+    ; fuck all this shit code. it did it's job though so thank you!!!!
+
+    ; ok so what I need to do. right now ima see if i can create the text when interacting with the toilet
+            ; i still need to iterate through each game object each frame so ugh i'll set that up next
+            ; lets just get it to display like 4 things and then after x time deletes 2, then y time deletes the other 2?
+                ; well i guess it doesn't do the delete. 
+                    ; I need to have a text box function that each text uses as its game object function
+                        ; the generic version can have like, uses a pointer to get all the characters and placements and how long it will stay out/goes away from another source
+                            ; wait thats more a generic create function
+                        ; generic game loop function would just decrement the counter if it had it.
+
+    ; ok focus on this function
+
+    ; basically we will grab the tables ToiletLetters1 - 4? and make the game objects.
 
     lda bathroomFlag
     cmp #$00
@@ -1530,14 +1557,36 @@ ToiletInteract:
 @ToiletInteractDone:
     rts 
 
+;; fuck ima need to make a more streamlined way to display text. cause this sucks.
+    ;; def make defines for each tile for each letter cause this is annoying af
     
 .word ToiletLetters1
 .word ToiletLetters2
 ToiletLetters1: 
     ;      y  tile  att   x    y   tile att   x
-    .byte $10, $D0, $00, $80 
+    .byte $10, $D0, $00, $88 
 ToiletLetters2:
     .byte $10, $D8, $00, $90
+ToiletLetters3:
+    .byte $10, $D9, $00, $A0
+ToiletLetters4:
+    .byte $10, $D2, $00, $A8
+ToiletLetters5:
+    .byte $10, $DC, $00, $B0
+ToiletLetters6:
+    .byte $10, $DC, $00, $B8
+ToiletLetters7:
+    .byte $18, $D0, $00, $90
+ToiletLetters8:
+    .byte $18, $D2, $00, $98
+ToiletLetters9:
+    .byte $18, $DB, $00, $A0
+ToiletLetters10:
+    .byte $18, $D5, $00, $A8
+
+
+ToiletLetterGameLoop:
+    rts 
 
 ToiletInteractSetSprites:
     lda #$3C
@@ -1545,135 +1594,7 @@ ToiletInteractSetSprites:
 
     ldy #$00
 
-    lda #$10                                ; G
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$88
-    sta bathroomToiletSpriteStart, y 
-    iny 
 
-    lda #$10                                ; O
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$90
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; P        
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D9
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; I
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D2
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; S
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DC
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$B0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$10                                ; S
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DC
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$B8
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                                ; G
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$90
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; I
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D2
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$98                            
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; R
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$DB
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A0
-    sta bathroomToiletSpriteStart, y 
-    iny 
-
-    lda #$18                            ; L
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$D5
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$00
-    sta bathroomToiletSpriteStart, y 
-    iny 
-    lda #$A8
-    sta bathroomToiletSpriteStart, y  
-    
     rts 
 
 Interact:
@@ -2111,6 +2032,20 @@ InitializeGameObjectRam:
     iny 
     lda (pointerLo),y 
     sta objectXPos,x 
+
+    ; we need 
+        ; objectVar1
+        ; objectHi
+        ; objectLo
+        ; objectVar2
+
+    ; I don't need to decide on an order yet. lets make sure I can create and delete and iterate game objects with this bullshit first
+        ; But i will need to decide on an ordering
+        ; fuck do I need to start doing documentation?
+            ; is that me? I feel like i always start it and then don't update it and then its too much to update and it will just change so I might as well just wait till im done to do it 
+                ; yeah that is more me
+            ; ok random comment buried in the code it is    
+
     ; I THINK THIS IS RIGHT? just taking fromt table and placing into var.
 
 
@@ -2247,7 +2182,7 @@ DeleteGameObject:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
+    
     ; target < FFS
     ; first we need to say target.next points to FFS
         ; y is current and is the target since we have found target
@@ -2276,6 +2211,16 @@ DeleteGameObject:
 
 
 ; so. i need to take into account where to start. cause things like timers and shit. unless i load those into ram but idk if i need to. i think they are their own thing?
+
+
+; this function is written to work for now. but we have to be overhauled when game objects start to have more than one tile associated with them.
+    ; i'll have to write draw functions for each and then figure out a buffer
+    ; it seems like people have implemented buffers in their games for shit so i think its a solid idea. just don't know how bigg and how many and what overhead they require
+        ; addressHi, addressLo, count, data, data.... is one idea
+            ; having the address means it can be more generic. 
+                ; i wonder if I could turn all my tables into a format that would work with the buffer?
+                ; at least it would streamline some of the handling of data
+                    ; not sure if there is any actual benefit but its something to consider down the road
 CopyObjectRamToSpriteRam:
     
     ldx #$00
@@ -2283,7 +2228,7 @@ CopyObjectRamToSpriteRam:
 
 @SpriteCopyLoopStart:    
     cpy #objectMax
-    beq @DoneCopyingSpriteData
+    beq @WritingFE
 
     lda objectYPos,y
     sta SPRITE_RAM_START,x
@@ -2301,6 +2246,40 @@ CopyObjectRamToSpriteRam:
     lda objectNext,y 
     tay 
     jmp @SpriteCopyLoopStart
+
+; ok we need to also copy $FE to the rest of the space in case there is sprite data from a deleted sprite that isn't overwritten with new sprite data
+
+    ;so if x is 20 * 5 = 100. which is... $64 
+    ; wait var count doesn't matter. cause its just 4 per right? caused its 4 bytes per.
+    ; if x is that, then we are at the end of ram space for game objects. so we are done over writing possible junk with $FE
+            ; oh idea....
+                ; what if we only over write when we delete a game object?
+                ; that seems like it either would actually suck 
+                    ; only make a difference if i delete a lot of things a lot, or some other niche way the game plays out and im not sure
+                    ; or be really cool and quick and smart and make me look like a genius
+                ; def worth looking into. I can always count the CCs or might only be able to know after I see how many and how often im creating and deleting game objects.
+
+; when gameobjects have their own write functions that fill a buffer this will be not needed 
+@WritingFE:             
+    lda #$FE
+
+    ; I "unrolled" this loop. I remember reading about it in hardware class and i saw it online which reminded me about it
+        ; i think it works, since each object is 4 bytes, i should be able to write FE in groups of 4 without ever leaving garbage or overwriting where I shouldn't be
+
+    ; this whole part has 0 error checking so far i'm honestly weirdly brain fried right now yolo 
+@WritingFELoop:
+    cpx #objectMax * 4
+    beq @DoneCopyingSpriteData
+    sta SPRITE_RAM_START, x
+    inx 
+    sta SPRITE_RAM_START, x
+    inx 
+    sta SPRITE_RAM_START, x
+    inx 
+    sta SPRITE_RAM_START, x
+    inx 
+    jmp @WritingFELoop 
+
 @DoneCopyingSpriteData:
     rts 
 
