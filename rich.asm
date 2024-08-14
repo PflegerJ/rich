@@ -158,8 +158,8 @@
     scottDataStartHi: .res 1
     ;; Game Engine shit
     spriteRamStart = $0300  ; what the fuck is this naming convention? this is where i store game object data
-    objectMax = $10
-    variableCount = $8
+    objectMax = 16
+    variableCount = 8
   ;  object_y_pos = spriteramstart + object_max*0
    ; object_tile = spriteramstart +object_max*1
    ; object_att = spriteramstart + object_max*2
@@ -185,6 +185,11 @@
     objectHi = spriteRamStart + objectMax * 6
     objectLo = spriteRamStart + objectMax * 7
 
+    ; I might need 16 bytes per game object. or use some zero page values to store the info of the current object I'm working on. but like speed and shit i never even considered.
+        ; In my shit current game speed isn't a thing. but having 16 ( 15 really cause 1 is next ) variables would give me any wiggle room
+            ; but it might just be too much space
+        ; I could maybe get away with 12 variables? that would give me 21 game objects instead of 16
+        ; but lets not worry about that right now
     firstFreeSlot:      .res 1
     firstOccupiedSlot:  .res 1
     lastOccupiedSlot:   .res 1
@@ -2018,21 +2023,40 @@ InitializeGameObjectRam:
     ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
     ; lets just do it here
     ; we doing dumb shit. the order before actually setting all the variables
-    ; y pos | tile | att | x pos
+    ; y pos | tile | att | x pos 
     ldx firstFreeSlot           ; this is the offset for putting the data
     ldy #$00                    ; this is the offset of the data table we grabbing the data from
-    lda (pointerLo),y 
+    lda (pointerLo),y   ; y pos
     sta objectYPos,x 
     iny 
-    lda (pointerLo),y 
+    lda (pointerLo),y   ; tile
     sta objectTile,x 
     iny 
-    lda (pointerLo),y 
+    lda (pointerLo),y   ; att
     sta objectAtt,x 
     iny 
-    lda (pointerLo),y 
-    sta objectXPos,x 
+    lda (pointerLo),y   ; x pos
+    sta objectXPos,x
+    iny  
+    lda (pointerLo),y   ; HI byte of gameLoop function
+    sta objectHi,x 
+    iny 
+    lda (pointerLo),y   ; Lo
+    sta objectLo,x 
+    iny 
+    lda (pointerLo),y   ; the one variable my objects have right now
+    sta objectVar1,x 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
+    ;objectXPos = spriteRamStart + objectMax * 1
+    ;objectYPos = spriteRamStart + objectMax * 2
+    ;objectTile = spriteRamStart + objectMax * 3
+    ;objectAtt = spriteRamStart + objectMax * 4
+    ;objectVar1 = spriteRamStart + objectMax* 5
+    ;objectHi = spriteRamStart + objectMax * 6
+    ;objectLo = spriteRamStart + objectMax * 7
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ; we need 
         ; objectVar1
         ; objectHi
@@ -2221,6 +2245,19 @@ DeleteGameObject:
                 ; i wonder if I could turn all my tables into a format that would work with the buffer?
                 ; at least it would streamline some of the handling of data
                     ; not sure if there is any actual benefit but its something to consider down the road
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
+    ;objectXPos = spriteRamStart + objectMax * 1
+    ;objectYPos = spriteRamStart + objectMax * 2
+    ;objectTile = spriteRamStart + objectMax * 3
+    ;objectAtt = spriteRamStart + objectMax * 4
+    ;objectVar1 = spriteRamStart + objectMax* 5
+    ;objectHi = spriteRamStart + objectMax * 6
+    ;objectLo = spriteRamStart + objectMax * 7
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; I'm stupid I don't need the other variables even for this stupid version. This is just display info which only uses y pos, tile, att, x pos
 CopyObjectRamToSpriteRam:
     
     ldx #$00
@@ -2242,6 +2279,7 @@ CopyObjectRamToSpriteRam:
     lda objectXPos,y 
     sta SPRITE_RAM_START,x
     inx 
+    lda ob
     
     lda objectNext,y 
     tay 
@@ -2270,10 +2308,10 @@ CopyObjectRamToSpriteRam:
 @WritingFELoop:
     cpx #objectMax * 4
     beq @DoneCopyingSpriteData
-    sta SPRITE_RAM_START, x
-    inx 
-    sta SPRITE_RAM_START, x
-    inx 
+    sta SPRITE_RAM_START, x         ; I need to write FE ( variable count ) * ( objectMax - Number of Ga,me Objects in Ram )
+    inx                                 ; but its 8 times per object slot since we are running ith 8 variables
+    sta SPRITE_RAM_START, x     ; wait
+    inx                             ; I don't copy over all this data its just the display info so I don't need to do it 8 times or whatever I'm stupid
     sta SPRITE_RAM_START, x
     inx 
     sta SPRITE_RAM_START, x
