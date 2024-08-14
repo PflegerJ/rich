@@ -1554,19 +1554,73 @@ ToiletInteract:
 
     ; basically we will grab the tables ToiletLetters1 - 4? and make the game objects.
 
-    lda bathroomFlag
+    ; returning here after a couple of days rotting away and wasting my life
+        ; did I even do anything last time?
+    
+    ; ok all this is trash I think I can just remove. I might need to check the bathroom function to see if it breaks but ima have to edit that anyways probably at least who the fuck know idk what code i wrote yesterday so no way i know what the fuck is going on in that function 
+   ; lda bathroomFlag
+   ; cmp #$00
+   ; bne @ToiletInteractDone  ; text is still there. i don't want to reset the text timer cause idc
+   ; jsr ToiletInteractSetSprites
+
+    ; so
+    ; wait 
+    ; that code might not be useless...
+    lda bathroomFlag        ; could make this room flag and just be used by whatever room is loaded. 
     cmp #$00
     bne @ToiletInteractDone  ; text is still there. i don't want to reset the text timer cause idc
-    jsr ToiletInteractSetSprites
+    ; jsr ToiletInteractSetSprites
+    ; fucking a man
+        ; should the toilet be a game object? or should it be some static thing in the room. fuck
+            ; thats for later but will have to change this depending on my choice but when do i not have to redo code when i learn more better
+    
+    ; i'll have the text set the bathroomflag back to 0 when they realize they about to be deleted. obvi that a shit way but again. also it isn't that bad when its just 1 game obj instead of 1 per char
+    inc bathroomFlag
+
+    ; i need some loop to create the 4 characters
+        ; it needs to set pointerLo and PointerHi to the right toiletLettersX
+        ; i think thats it? then just make sure toiletLettersX table is formatted correctly
+        
+    ldx #$00    ; idk which but i haven't used any registers so yolo
+    ldy #$00
+    ; ok 
+    lda #<(ToiletLetters1)
+    sta pointerLo
+    lda #>(ToiletLetters1)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters2)
+    sta pointerLo
+    lda #>(ToiletLetters2)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters3)
+    sta pointerLo
+    lda #>(ToiletLetters3)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters4)
+    sta pointerLo
+    lda #>(ToiletLetters4)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    ;; ok i still need to fix the data tables and create a gameloop function. but it seems like its working
+
 
 @ToiletInteractDone:
     rts 
 
 ;; fuck ima need to make a more streamlined way to display text. cause this sucks.
     ;; def make defines for each tile for each letter cause this is annoying af
-    
+.word ToiletLetterGameLoop
 .word ToiletLetters1
 .word ToiletLetters2
+.word ToiletLetters3
+.word ToiletLetters4
 ToiletLetters1: 
     ;      y  tile  att   x    y   tile att   x
     .byte $10, $D0, $00, $88 
@@ -1590,6 +1644,21 @@ ToiletLetters10:
     .byte $18, $D5, $00, $A8
 
 
+;; i honestly need to write the game loop interation function first. cause idk how I'll access the object's variables. if some register should have the offset already
+    ; or if i save the current offset to a variable or something.
+
+; but the gist of this dummy version
+    ; check var1 which is the timer 
+    ; if 0 set bathroomflag to 0 and call to be deleted
+    ; if > 0 dec var1 
+        ; thats it
+    
+    ; also fuck im wondering if I should like queue up things that should be deleted
+        ; one example:
+                ; object A does it's code. it hit object B but also got hit and takes lethal dmg. it deletes itself.
+                ; object b does it's code. it was hit by A but also hits A. but A is already deleted so it can't get any info from it
+            ; maybe it would work where both objects are updated.
+                ; but that update could affect other shit? this honestly is outside my current knowledge of all the systems required so i'll come back to this way later
 ToiletLetterGameLoop:
     rts 
 
@@ -2023,7 +2092,7 @@ InitializeGameObjectRam:
     ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
     ; lets just do it here
     ; we doing dumb shit. the order before actually setting all the variables
-    ; y pos | tile | att | x pos 
+    ; y pos | tile | att | x pos | hi | lo | var
     ldx firstFreeSlot           ; this is the offset for putting the data
     ldy #$00                    ; this is the offset of the data table we grabbing the data from
     lda (pointerLo),y   ; y pos
@@ -2279,7 +2348,6 @@ CopyObjectRamToSpriteRam:
     lda objectXPos,y 
     sta SPRITE_RAM_START,x
     inx 
-    lda ob
     
     lda objectNext,y 
     tay 
