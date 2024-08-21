@@ -19,6 +19,8 @@
     ;; Variables
     pointerLo:      .res 1  ; pointer variables are declared in RAM
     pointerHi:      .res 1  ; low byte first, high byte immediately after
+    jumpLo:         .res 1
+    jumpHi:        .res 1
     gameObjectLo:   .res 1  ; pointer variables for storing the game objects in ram
     gameObjectHi:   .res 1
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
@@ -34,6 +36,7 @@
     
     temp1:          .res 1
     temp2:          .res 1
+    stupidTemp:     .res 1
      ; am i dumb or is this needed. like who fucking knows at this point. wait. other way is having tables 
         ; its always fucking tables. 
         ; should i just yolo table style first?
@@ -1584,6 +1587,39 @@ ToiletInteract:
     ldx #$00    ; idk which but i haven't used any registers so yolo
     ldy #$00
     ; ok 
+
+    ;; so. i have in ROM. a table with the label ToiletLetters1. that label is for readablitity. computer no see label.
+        ; so that's why I have to have store the address of the label somewhere with the .word ToiletLetters1
+        ; then when I want to get the data from that table. 
+            ; I use < for lo ( left l low ) and > for hi
+            ; but I use #. because
+                ; because I want the data. right?
+                    ; the data is an address which I think is why its confusing
+                ; but example:
+                    ; .word ToiletLetters1 ( this is storign the address of the label which is the start of the table. )
+                                                        ; $A000:    $02     
+                                                        ; $A001:    $AB   
+                    ; ToiletLetters1: ( this is just a label for me, it is not stored anywhere in mem when assembled. thats why we have either the hi lo tables or the .word of the label somewhere )
+                        ; .byte $80, $10, $00, $68
+                                                        ; $02AB:    $80
+                                                        ; $02AC:    $10
+                                                        ; $02AD:    $00
+                                                        ; $02AE:    $68
+        ; the data at $A000 is the address of the table
+            ; so we use # to get the data
+
+        ; i'll fuck this up again but its starting to sink in
+            ; refrences and pointers might be easy after this project who knows   
+        
+        ; literally isntantly i don't get it
+            ; why can i just do <ToiletLetterGameLoop no problem?
+                ; um
+                    ; so. when its a label to a table. its not stored anywhere in mem actually
+                        ; but in this case. we are trying to use the not stored memory address,
+                            ; we are storing the memory address of the label. 
+                                ; if we used # then it would be getting the opcode byte values of the code from the function ToiletLettersGameLoop
+                            ; wow way to work through it :)
+
     lda #<(ToiletLetters1)
     sta pointerLo
     lda #>(ToiletLetters1)
@@ -1608,6 +1644,41 @@ ToiletInteract:
     sta pointerHi
     jsr CreateGameObject2
 
+    lda #<(ToiletLetters5)
+    sta pointerLo
+    lda #>(ToiletLetters5)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters6)
+    sta pointerLo
+    lda #>(ToiletLetters6)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters7)
+    sta pointerLo
+    lda #>(ToiletLetters7)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters8)
+    sta pointerLo
+    lda #>(ToiletLetters8)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters9)
+    sta pointerLo
+    lda #>(ToiletLetters9)
+    sta pointerHi
+    jsr CreateGameObject2
+
+    lda #<(ToiletLetters10)
+    sta pointerLo
+    lda #>(ToiletLetters10)
+    sta pointerHi
+    jsr CreateGameObject2
     ;; ok i still need to fix the data tables and create a gameloop function. but it seems like its working
 
 
@@ -1621,27 +1692,33 @@ ToiletInteract:
 .word ToiletLetters2
 .word ToiletLetters3
 .word ToiletLetters4
+.word ToiletLetters5
+.word ToiletLetters6
+.word ToiletLetters7
+.word ToiletLetters8
+.word ToiletLetters9
+.word ToiletLetters10
 ToiletLetters1: 
-    ;      y  tile  att   x    y   tile att   x
-    .byte $10, $D0, $00, $88 
+    ;      y  tile  att   x    hi  lo var ?
+    .byte $10, $D0, $00, $88, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
 ToiletLetters2:
-    .byte $10, $D8, $00, $90
+    .byte $10, $D8, $00, $90, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
 ToiletLetters3:
-    .byte $10, $D9, $00, $A0
+    .byte $10, $D9, $00, $A0, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $A0 
 ToiletLetters4:
-    .byte $10, $D2, $00, $A8
+    .byte $10, $D2, $00, $A8, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $A0 
 ToiletLetters5:
-    .byte $10, $DC, $00, $B0
+    .byte $10, $DC, $00, $B0, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $A0 
 ToiletLetters6:
-    .byte $10, $DC, $00, $B8
+    .byte $10, $DC, $00, $B8, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $A0 
 ToiletLetters7:
-    .byte $18, $D0, $00, $90
+    .byte $18, $D0, $00, $90, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $FF 
 ToiletLetters8:
-    .byte $18, $D2, $00, $98
+    .byte $18, $D2, $00, $98, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $FF
 ToiletLetters9:
-    .byte $18, $DB, $00, $A0
+    .byte $18, $DB, $00, $A0, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $FF
 ToiletLetters10:
-    .byte $18, $D5, $00, $A8
+    .byte $18, $D5, $00, $A8, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $FF
 
 
 ;; i honestly need to write the game loop interation function first. cause idk how I'll access the object's variables. if some register should have the offset already
@@ -1658,8 +1735,23 @@ ToiletLetters10:
                 ; object A does it's code. it hit object B but also got hit and takes lethal dmg. it deletes itself.
                 ; object b does it's code. it was hit by A but also hits A. but A is already deleted so it can't get any info from it
             ; maybe it would work where both objects are updated.
-                ; but that update could affect other shit? this honestly is outside my current knowledge of all the systems required so i'll come back to this way later
+; but that update could affect other shit? this honestly is outside my current knowledge of all the systems required so i'll come back to this way later             
+
 ToiletLetterGameLoop:
+    ; so the offset is in x right now
+    ; we following the logic in the comments above this function
+    lda #$01
+    sta bathroomFlag
+    lda objectVar1,x
+    sec 
+    sbc #$01  
+    cmp #$00
+    bne @StillAlive
+    sta bathroomFlag
+    jsr DeleteGameObject
+    rts 
+@StillAlive:
+    sta objectVar1,x
     rts 
 
 ToiletInteractSetSprites:
@@ -1915,6 +2007,12 @@ SetPlayerPositionMultipleOptions:
     lda (pointerLo), Y
     sta playerYpos 
     rts 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ; oh boy pray for me
 ; im just yoloing. i made a new branch
@@ -2389,6 +2487,97 @@ CopyObjectRamToSpriteRam:
 @DoneCopyingSpriteData:
     rts 
 
+
+; the big boy
+; what do i need to do:
+    ; start at first occupied slot
+    ; get objectHi and objectLo and jmp to it using pha and pho? fuck what the other one i'll find is somehwere its pla
+    ; which would go to that objects game loop function when i rts....
+        ; so i would not go back to this function then...... i guess thats why they have the jump engine? cause anytime you need to do something like this.
+            ; you can jsr to the jump engine. then pha the address of where you want to go. then when you rts you go there
+                ; and then when you rts from there, you go back to the function that called jsr jumpengine. its almost like you need that middle man.
+    
+    ; i guess i could have just a little inner function. kind of like recurrsion. well only in the sense there is a smaller header function called and then it insta goes into the helper function that is the majority of the code
+
+GameEngine:
+    ; lets think about this sans jump engine. cause i think that is not what i need for the way this is set up. might be the thing i need later when im smarter. but right now my code aint set up for that bullllshit
+
+    ; so. we need to iterate through all the game objects. and run their specific code.
+        ; what makes sense to me. is loop through using gameObjNext != objectMax, then get there address and rts to it.
+            ; so loop will call like jsr do game obj if we aren't at gameobjmax. so when that function rts's it comes back here? where we can keep looping
+                    ; that makes sense to my dumb brain so thats what we going to do
+    
+    ; things i need to consider:
+        ; what state the registers are in
+        ; do I need to store the offset of the game object somewhere ( oh god i haven't thought about collisions or physics kill me )
+        ; one thing at a time. lets get this working so i can keep going
+
+    ; this is all just game object stuff. i'll figure the rest out later. gameobj iteration is the focus
+    lda firstOccupiedSlot
+@StartIteratingThroughGameObjects:
+
+    cmp #objectMax
+    beq @DoneIteratingThroughGameObjects
+    ; so right now A contains the gameObject offset.
+    tax ; now this is podracing. tax before cause we going to have to tax after too :)
+    lda objectNext,x
+    sta stupidTemp
+    jsr GameObjectIteration ; this function will set up the pointer for the gameobject code and then rts. which will take it to that function, and then return back here    
+   ; lda objectNext,x    ; why are linked lists so sexy?
+    lda stupidTemp ; i have to do this cause im deleting the game object and then that fucks up the linked list
+        ; so i'll def need a buffer to store the objects i want to delete and do that at the end
+    jmp @StartIteratingThroughGameObjects
+
+@DoneIteratingThroughGameObjects:       ; think thats literally it. for code here. 
+
+    rts 
+
+
+
+; so we have... the object's offset in x cause we are gamers
+; if this is reused slightly differently i feel like it should be easy to make it more generic 
+GameObjectIteration:
+    lda objectHi,x ; push hi byte first
+    pha 
+    lda objectLo,x 
+    pha 
+    ; now rts should take us to the game objects code
+        ; when that rts it should go back to GameEngine subroutine
+    rts 
+
+; ok do i make this for gameloop or do i try and make it generic. would making it generic benefit any of the functions that use the stack to jump to a function from an address table
+    ; right now. i want it to work
+    ; i don't think generic is that hard. i also annoyingly have seen the code for this so i feel kind of icky but whatever. i did organically come up with the idea even if i knew of the concept before hand
+    ; still i like doing the discovery. i don't want to copy i want it to be my own but whatever
+JumpEngine:
+    ; i think its too late to start.
+    
+    ; but basically what.
+
+    ; so i use some index to figure out what im jumping to which should be in A
+    ; the jump addresses are either 
+        ; if i taking the idea from mario then i take the return address and use that with the index
+        ; not sure if there is a different way i'll need to think
+            ; mostly just i need to structure everthing around this.
+
+    ; if i pull the return address off the stack, i either need to re-push it back or i think what they do is store it as in a pointer. which im not sure why
+
+    ; we are assuming that we are going to take the return address, use it as the pointer to grab the actual jmp address and then jump to it.
+        ; assuming the offset is already in A
+    asl     ; this shifts the index over 1 bit ( index * 2 ). this is because each address is 2 bytes, so if we want the 2nd address, the index would be 1 (cause 0 is for 1st). then * 2 to get index = 2 since its the 3rd byte we need. it makes sense why am i writing it out so poorly
+    tay     
+    pla     ; pulling first byte of return address on the stack. hihg byte on the stack first. then low so low is pulled first
+    sta pointerLo   ; is the high or low byte on the stack first?
+    pla 
+    sta pointerHi
+    iny                 ; you have to increment cause whats on the stack is -1 of the address of the next value. so we need to go up 1 to get to the address following the jsr jumpengine
+    lda (pointerLo),y
+    sta jumpHi          ; i think this is wrong. cause it seems like they store hi then low. but like my pointers always be lo then hi but is jump different?
+    iny 
+    lda (pointerLo),y
+    sta jumpLo          ; god the amount of code i'll need to write to properly test this is bullshit
+    jmp (jumpHi)
+    rts 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -2473,7 +2662,7 @@ clearnametables:
 
 
 ;asdfasdf
-    CLI 
+     CLI 
     LDA #%10010000  ; enable NMI, sprites from pattern table 0, background from 1
     STA PPU_CTRL_REG1
     LDA #%00011110  ; background and sprites enable, no left clipping
@@ -2498,62 +2687,13 @@ Main:
     jsr Timer2
     jsr ReadController1
     jsr PlayerLogic
-
-
-
-   ; ldy #$00
-   ; lda DefaultObjectStartLo, y
-   ; sta pointerLo
-   ; lda DefaultObjectStartHi, y
-   ; sta pointerHi
-   ; jsr CreateGameObject
-
-    
-   ; ldy #$00
-   ; lda DefaultObjectStartLo, y
-   ; sta pointerLo
-  ;  lda DefaultObjectStartHi, y
-  ;  sta pointerHi
-   ; jsr CreateGameObject
-
-
+    jsr GameEngine
 
     ldx #$02
-
-    ;lda controller1
-   ; and #%00001000      ; checking if up is pressed
-   ; beq upNotPressed
-   ; jsr moveUp
-upNotPressed:
- ;   lda controller1
-  ;  and #%00000100      ; checking if down is pressed
-  ;  beq downNotPressed
-   ; jsr moveDown
-downNotPressed:
-   ; lda controller1
-   ; and #%00000010
-   ; beq leftNotPressed
-   ; jsr moveLeft
-leftNotPressed:
-   ; lda controller1
-   ; and #%00000001
-   ; beq rightNotPressed
-   ; jsr moveRight
-rightNotPressed:
-    ;lda playerXpos
-   ; sta $0203
-   ; lda playerYpos
-   ; sta $0200
 
     jsr DoAction
 
     jsr ControllerLogic
-
-  ;  lda #<ToiletLetters1
-   ; sta pointerLo
-    ;lda #>ToiletLetters1
-    ;sta pointerHi
-    ;jsr CreateGameObject2
 
     
 
