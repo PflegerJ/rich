@@ -23,6 +23,8 @@
     jumpHi:        .res 1
     gameObjectLo:   .res 1  ; pointer variables for storing the game objects in ram
     gameObjectHi:   .res 1
+    spriteBufferLo: .res 1  ; pointer to where i'm placing sprite ram for drawing system. lo should be the value of the last object inserted (target address - 1)
+    spriteBufferHi: .res 1
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
    ; playerXpos:     .res 1  
    ; playerYpos:     .res 1
@@ -161,8 +163,8 @@
     scottDataStartHi: .res 1
     ;; Game Engine shit
     spriteRamStart = $0300  ; what the fuck is this naming convention? this is where i store game object data
-    objectMax = 16
-    variableCount = 8
+    objectMax = 8
+    variableCount = 13
   ;  object_y_pos = spriteramstart + object_max*0
    ; object_tile = spriteramstart +object_max*1
    ; object_att = spriteramstart + object_max*2
@@ -183,11 +185,19 @@
     objectXPos = spriteRamStart + objectMax * 1
     objectYPos = spriteRamStart + objectMax * 2
     objectTile = spriteRamStart + objectMax * 3
+    ; objectVar2 = spriteRamStart + objectMax * 3     this should replace tile since we will have a draw function so no tile needed
     objectAtt = spriteRamStart + objectMax * 4
     objectVar1 = spriteRamStart + objectMax* 5
     objectHi = spriteRamStart + objectMax * 6
     objectLo = spriteRamStart + objectMax * 7
 
+    ; these aren't implemented into the game engine side but i want them here while i start thinking about it with scott stuff
+    
+    objectXPosFloat = spriteRamStart + objectMax * 8
+    objectYPosFloat = spriteRamStart + objectMax * 9
+    objectDrawHi = spriteRamStart + objectMax * 10
+    objectDrawLo = spriteRamStart + objectMax * 11
+    objectVar2 = spriteRamStart + objectMax * 12
     ; I might need 16 bytes per game object. or use some zero page values to store the info of the current object I'm working on. but like speed and shit i never even considered.
         ; In my shit current game speed isn't a thing. but having 16 ( 15 really cause 1 is next ) variables would give me any wiggle room
             ; but it might just be too much space
@@ -1064,6 +1074,7 @@ BathroomBasedEvents:
                     ; please
                         ; oh baby
                             ; don't go
+    rts 
     lda bathroomFlag
     cmp #$00
     beq @BathroomBasedEventsDone
@@ -1626,59 +1637,7 @@ ToiletInteract:
     sta pointerHi
     jsr CreateGameObject2
 
-    lda #<(ToiletLetters2)
-    sta pointerLo
-    lda #>(ToiletLetters2)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters3)
-    sta pointerLo
-    lda #>(ToiletLetters3)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters4)
-    sta pointerLo
-    lda #>(ToiletLetters4)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters5)
-    sta pointerLo
-    lda #>(ToiletLetters5)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters6)
-    sta pointerLo
-    lda #>(ToiletLetters6)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters7)
-    sta pointerLo
-    lda #>(ToiletLetters7)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters8)
-    sta pointerLo
-    lda #>(ToiletLetters8)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters9)
-    sta pointerLo
-    lda #>(ToiletLetters9)
-    sta pointerHi
-    jsr CreateGameObject2
-
-    lda #<(ToiletLetters10)
-    sta pointerLo
-    lda #>(ToiletLetters10)
-    sta pointerHi
-    jsr CreateGameObject2
+   
     ;; ok i still need to fix the data tables and create a gameloop function. but it seems like its working
 
 
@@ -1700,7 +1659,7 @@ ToiletInteract:
 .word ToiletLetters10
 ToiletLetters1: 
     ;      y  tile  att   x    hi  lo var ?
-    .byte $10, $D0, $00, $88, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
+    .byte $10, $D0, $00, $88, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic, <DrawTextStatic - 1, $40, $00 
 ToiletLetters2:
     .byte $10, $D8, $00, $90, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
 ToiletLetters3:
@@ -1811,6 +1770,32 @@ ControllerLogic:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; I do not remember any of this scott code. 
+; right now I basically just render or don't render his sprite. 
+; what do I need
+    ; I need a couple tables, for when he enters. x y pos. facing direction.
+    ; I need a table for his pathing
+        ; could do like a value for every turn.
+        ; and either do like. which way to turn, or have a check when figuring how his next position, and change dir based on that but that sounds more complicated than it needs to be writing it out
+    
+    ; I need to figure out collision
+    ; I need to figure out if he going in objram or his own special spot
+        ; the only reason for specialk spot is cause he does shit when off screen ( I want him to continue his pathing to bed even if i'm in my room. )
+            ; or another thing is store his posisiton. then when I re enter room, figure out how far he would have traveled in the time but idk if that is worth it
+    ; he obviously needs a draw function god
+    
+    ; like. where does scott go in the order of calls?
+        ; does he go in like main? and i check if i should do anything first each time
+        ; does he go in specific room stuff? like living room function has jsr scott
+        ; does he go in obj ram and the rooms or something just check if he needs to be created?
+    
+    
+
+
+
+
+
+
 ScottLogic:
 
     ;; check scotts state to see if he is already loaded 
@@ -2190,7 +2175,7 @@ InitializeGameObjectRam:
     ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
     ; lets just do it here
     ; we doing dumb shit. the order before actually setting all the variables
-    ; y pos | tile | att | x pos | hi | lo | var
+    ; y pos | tile | att | x pos | game routine hi | game routine lo | draw function hi | draw function lo | var 1 | var 2
     ldx firstFreeSlot           ; this is the offset for putting the data
     ldy #$00                    ; this is the offset of the data table we grabbing the data from
     lda (pointerLo),y   ; y pos
@@ -2211,8 +2196,17 @@ InitializeGameObjectRam:
     lda (pointerLo),y   ; Lo
     sta objectLo,x 
     iny 
+    lda (pointerLo),y   ; draw function hi
+    sta objectDrawHi,x 
+    iny 
+    lda (pointerLo),y   ; drawfunction lo
+    sta objectDrawLo,x 
+    iny 
     lda (pointerLo),y   ; the one variable my objects have right now
     sta objectVar1,x 
+    iny 
+    lda (pointerLo),y 
+    sta objectVar2,x    ; var 2
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
@@ -2578,6 +2572,169 @@ JumpEngine:
     sta jumpLo          ; god the amount of code i'll need to write to properly test this is bullshit
     jmp (jumpHi)
     rts 
+
+
+
+DrawEngine:
+    lda firstOccupiedSlot
+
+@DrawEngineLoopStart:
+    cmp #objectMax
+    beq @DoneDrawing
+    tax 
+    lda objectNext,x 
+    sta stupidTemp
+    jsr DrawEngineJmp
+    lda stupidTemp
+    jmp @DrawEngineLoopStart
+@DoneDrawing:
+    rts 
+
+
+DrawEngineJmp:
+    lda objectDrawHi,x 
+    pha 
+    lda objectDrawLo,x 
+    pha 
+    rts 
+;; ONLY 8 SPRITES CAN SHARE A SCANLINE
+DrawTextStatic:
+; y is holding the current gameobject ID
+    ; this why i can't take these breaks. time to relearn fucking x and y reg with indirect addressing for the 100th time
+        ; its ok everytime i learn it i learn it more.... maybe
+        ; if it needs to be x i can move it or do something i will figure it out. stop letting everything you don't know stop you
+        ; you know nothing so who cares
+
+    ; first this is static. so what do i need. I need to know anchor pos, which objectxpos,y and objectypos,y should fetch.
+
+
+    
+    ; i need to get the address of the table of characters from TextTableLo and TextTableHi using var2 or some bits in var1 as the index to get the right text table address
+
+    ; buffer needs to first have count (which is characters in string * 4) but this would not include white space or newlines unless i do like some text box thingy which is not in this scope rn
+    ; I then need to loop through the characters,
+    ; putting into a buffer:
+        ; y pos that is objectypos + ( 8 * newline chars read )
+        ; tile that is take from the texttable
+        ; att this is either taken from text table or set as something default
+        ; x pos that is objectxpos + ( 8 * char count ( reset every newline char ))
+
+
+    ; so then how do i fill a buffer?
+        ; this is the hard part that hopefully will open up a lot more things to be possible.
+    ; im guessing i would have like. a variable that has the start of the buffer. so that is set.
+    ; and then a variable that is where the next value goes as an offset.
+    ; so like load buffer into pointer2Lo and pointer2Hi. and put data in (pointer2Lo),x where x isd that variable. put the 4 pieces of info in and then repeat for the next char
+    ; so then after we read the buffer we reset it by putting the pointer of the end at the start. no need to clear the data... well we would need to put 00 at the end then so it doesn't read some and then see garbage and think its the next count
+        ; but zeroing out the buffer sounds not the move. so just setting where its pointing to 00 after each draw func is called s ounds smart. that takes like no time.
+
+    ; i should have the pointer variable for the buffer already loaded at the start of the function that calls all the draw functions.
+    ; so it should be as simple as im currently doing with writing to sprite ram. just into the buffer instead. and then from that buffer go to sprite ram.
+
+
+; so like
+    ; i have current game obj ID
+    ; i use that to call this function from gameobjectDrawHi and Lo or whatever i named it 
+    ; i have some variable that is the offset to which text it is. which would be set when the text is created.
+    ; I then do what....
+    ; this would make sense to fill a buffer with y tile att x for each letter. then the function that calls this goes through that buffer and puts it into spriteram
+        ; for text that never moves i could hard code the locations maybe
+    
+
+    ; ok ima just make this one static. and then make one for text tat moves cause i need to start somewhere.
+    ; so basically i need to fill a buffer with the this info. and then in the function that calls this one, read that buffer into the correct spot in mem
+    ;   cause idk where this will be written here. this is just to get the info and order it so its all ready to be easily copied over.
+
+    ; so we are going to use the x and y pos as the anchor. and then build from there. we can use $00 and $01 to indicate a space and a newline?
+        ; since we will have a count so we wont accidently read a $00 as end of buffer.
+            ; so the buffer in my head will look like <count>, data, data, data, count, data, count, data, data, data, data, $00 (end of buffer)
+                                                    ;   3, data, data, data, 1, data, 4, data, data, data, data, 00 ( the count is 0 i guess which also means end of buffer)
+    
+    
+    
+    
+    ; lets actually do some shit my girl
+
+    ; lets get the anchor coords and store in what temp1 and temp2?
+        ; wait the anchor is just xpos ypos. will need to edit when i add float
+
+
+    ; ok so i should have the variables be like the offset for the text table. lets say var 2 for now. might have to make it part of var1 depending
+    lda objectXPos,x
+    sta temp1
+    lda objectYPos,x
+    sta temp2
+
+    ldy objectVar2,x
+    lda TextTableHi,y 
+    sta pointerHi
+    lda TextTableLo,y 
+    sta pointerLo
+
+   ; tya         ; im going to push y on to the stack so i can get it back before leaving because its the gameobject offset and i can't lose it cause linked list
+    ;pha 
+    ldy #00     ; setting y to 0 to get the count from the text image data table
+   ; lda (pointerLo),y   ; this should be the count 
+ ;   tax         
+    
+@DrawTextLoopStart:
+    lda #$40
+    cmp spriteBufferLo
+    bcc @HaveNotLooped
+    sta spriteBufferLo
+@HaveNotLooped:
+    lda (pointerLo),y           ; this is either the y offset or FF to terminate
+    cmp #$FF                  ; when the count reaches 0 we are at the end of the text data
+    beq @DrawLoopEnd 
+    ; we need to get the y pos offset from the text table,
+    ;lda (pointerLo),y 
+    ; then add it to the anchor y pos (temp2)
+    clc 
+    adc temp2 
+    ; store it in buffer                                ; ok wait. so i need to use an offset to store it in buffer. but i think i have to use y. maybe i can use x? that would be nice but thats my count
+    sta (spriteBufferLo),y
+    ; inc y 
+    iny 
+
+
+    ; we have to grab the tile from the image data
+    lda (pointerLo),y
+    ; store that in buffer
+    sta (spriteBufferLo),y 
+    ; inc y for next tile data
+    iny 
+    
+    ; next is att. im going to grab it from ROM for now
+    lda (pointerLo),y 
+    ; store it in the buffer
+    sta (spriteBufferLo),y 
+    iny 
+
+    ; we need to get the x pos from the text table
+    lda (pointerLo),y 
+    ; add it to the x anchor
+    clc 
+    adc temp1
+    ; store that in buffer
+    sta (spriteBufferLo),y 
+    iny 
+    ; i think thats it 
+    jmp @DrawTextLoopStart
+@DrawLoopEnd:
+
+    ; at this point. each character should be ready to be displayed. so now i just have to save where the buffer pointer is and then im done
+    tya 
+    clc 
+    adc spriteBufferLo
+    sta spriteBufferLo 
+ ;   ; oh and get the gameObject offset back off the stack
+ ;   pla 
+  ;  tay 
+    rts 
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -2635,9 +2792,12 @@ clearnametables:
 
     jsr InitializeGameObjectRam
     
-    
+    lda #$02
+    sta spriteBufferHi
+    lda #$40
+    sta spriteBufferLo
 
-    jsr loadpalettes
+    jsr loadpalettes 
 
     jsr loadSprites
     jsr updateSprites
@@ -2695,9 +2855,9 @@ Main:
 
     jsr ControllerLogic
 
-    
+    jsr DrawEngine
 
-    jsr CopyObjectRamToSpriteRam
+    ;jsr CopyObjectRamToSpriteRam
 
     lda flag1           ; sets lag frame flag to 0: means game logic done and can update spriets on next vblank
     and #%11111110  
@@ -2783,6 +2943,16 @@ DefaultObjectStartLo:
 DefaultObjectStartHi:
     .byte >ScottStartingData
 
+
+TextTableLo:
+    .byte <SampleText
+TextTableHi:
+    .byte >SampleText
+
+SampleText: ; count ( sets of 4 ), y pos offset, tile, att (prob 0), x pos offset, ...
+    ; ok instead of count we read intil FE? cause i can't have y be 1
+    .byte $00, $D0, $00, $00,   $00, $D8, $00, $08, $FF
+                ;     H                    I
 StandingAnimation:
     .byte $00, $00, $00, $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
