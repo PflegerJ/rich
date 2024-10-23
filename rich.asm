@@ -25,6 +25,11 @@
     gameObjectHi:   .res 1
     spriteBufferLo: .res 1  ; pointer to where i'm placing sprite ram for drawing system. lo should be the value of the last object inserted (target address - 1)
     spriteBufferHi: .res 1
+    spriteBuffer:   .res 2
+    spriteBufferOffset:     .res 1
+    spriteBufferOffsetStart: .res 1
+    deleteBufferOffset: .res 1
+    deleteFlag:         .res 1
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
    ; playerXpos:     .res 1  
    ; playerYpos:     .res 1
@@ -76,6 +81,7 @@
     beerCount:                   .res 1      ; first half is cigs, 2nd beer bits: 0123 | 4567
     cigCount:                   .res 1
 
+    OBJECT_DELETE_BUFFER  = $30
     PPU_CTRL_REG1         = $2000
     PPU_CTRL_REG2         = $2001
     PPU_STATUS            = $2002
@@ -159,12 +165,13 @@
     bathroomToiletSpriteStart = $0238
     
     SPRITE_RAM_START        = $0240  ; which sprite ram start is this? god damn it jabes, this is where i put the sprite data from game objects
+    SPRITE_BUFFER_START     = $0200     ; this is what I'm using now. its where the sprites for game objects starts
     scottDataStartLo: .res 1
     scottDataStartHi: .res 1
     ;; Game Engine shit
     spriteRamStart = $0300  ; what the fuck is this naming convention? this is where i store game object data
     objectMax = 8
-    variableCount = 13
+    variableCount = 16
   ;  object_y_pos = spriteramstart + object_max*0
    ; object_tile = spriteramstart +object_max*1
    ; object_att = spriteramstart + object_max*2
@@ -198,6 +205,9 @@
     objectDrawHi = spriteRamStart + objectMax * 10
     objectDrawLo = spriteRamStart + objectMax * 11
     objectVar2 = spriteRamStart + objectMax * 12
+    objectAnimationOffset = spriteRamStart + objectMax * 13    ; im thinkin
+    objectAnimationTimer = spriteRamStart + objectMax * 14
+    objectState = spriteRamStart + objectMax * 15
     ; I might need 16 bytes per game object. or use some zero page values to store the info of the current object I'm working on. but like speed and shit i never even considered.
         ; In my shit current game speed isn't a thing. but having 16 ( 15 really cause 1 is next ) variables would give me any wiggle room
             ; but it might just be too much space
@@ -1659,7 +1669,7 @@ ToiletInteract:
 .word ToiletLetters10
 ToiletLetters1: 
     ;      y  tile  att   x    hi  lo var ?
-    .byte $10, $D0, $00, $88, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic, <DrawTextStatic - 1, $40, $00 
+    .byte $10, $D0, $00, $40, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic2, <DrawTextStatic2 - 1, $FF, $00, $00, $00, $00
 ToiletLetters2:
     .byte $10, $D8, $00, $90, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
 ToiletLetters3:
@@ -1697,6 +1707,16 @@ ToiletLetters10:
 ; but that update could affect other shit? this honestly is outside my current knowledge of all the systems required so i'll come back to this way later             
 
 ToiletLetterGameLoop:
+    dec objectVar1,x
+    lda objectVar1,x 
+    cmp #$00
+    beq @DeleteThis
+    sta objectVar1,x 
+    rts 
+@DeleteThis:
+    lda #$01
+    sta deleteFlag
+    rts 
     ; so the offset is in x right now
     ; we following the logic in the comments above this function
     lda #$01
@@ -2175,7 +2195,7 @@ InitializeGameObjectRam:
     ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
     ; lets just do it here
     ; we doing dumb shit. the order before actually setting all the variables
-    ; y pos | tile | att | x pos | game routine hi | game routine lo | draw function hi | draw function lo | var 1 | var 2
+    ; y pos | tile | att | x pos | game routine hi | game routine lo | draw function hi | draw function lo | var 1 | var 2 | animation offset | animation timer | object state
     ldx firstFreeSlot           ; this is the offset for putting the data
     ldy #$00                    ; this is the offset of the data table we grabbing the data from
     lda (pointerLo),y   ; y pos
@@ -2207,6 +2227,16 @@ InitializeGameObjectRam:
     iny 
     lda (pointerLo),y 
     sta objectVar2,x    ; var 2
+    iny 
+    lda (pointerLo),y 
+    sta objectAnimationOffset,x    ; animation offset
+    iny 
+    lda (pointerLo),y 
+    sta objectAnimationTimer,x    ; animation timer
+    iny 
+    lda (pointerLo),y 
+    sta objectState,x    ; state
+    iny 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
@@ -2494,6 +2524,8 @@ CopyObjectRamToSpriteRam:
     ; i guess i could have just a little inner function. kind of like recurrsion. well only in the sense there is a smaller header function called and then it insta goes into the helper function that is the majority of the code
 
 GameEngine:
+    lda #$00
+    sta deleteBufferOffset
     ; lets think about this sans jump engine. cause i think that is not what i need for the way this is set up. might be the thing i need later when im smarter. but right now my code aint set up for that bullllshit
 
     ; so. we need to iterate through all the game objects. and run their specific code.
@@ -2514,11 +2546,23 @@ GameEngine:
     beq @DoneIteratingThroughGameObjects
     ; so right now A contains the gameObject offset.
     tax ; now this is podracing. tax before cause we going to have to tax after too :)
-    lda objectNext,x
-    sta stupidTemp
-    jsr GameObjectIteration ; this function will set up the pointer for the gameobject code and then rts. which will take it to that function, and then return back here    
+    stx stupidTemp
+    ;lda objectNext,x
+    ;sta stupidTemp
+    jsr GameObjectIteration ; this function will set up the pointer for the gameobject code and then rts. which will take it to that function, and then return back here
+    lda deleteFlag
+    cmp #$00            ; could maybe do a shift and branch on carry or whatever for optimization
+    beq @DontDelete    
    ; lda objectNext,x    ; why are linked lists so sexy?
-    lda stupidTemp ; i have to do this cause im deleting the game object and then that fucks up the linked list
+    lda stupidTemp
+    ldx deleteBufferOffset
+    sta OBJECT_DELETE_BUFFER,x
+    inx 
+    stx deleteBufferOffset
+
+@DontDelete:
+    ldx stupidTemp ; i have to do this cause im deleting the game object and then that fucks up the linked list
+    lda objectNext,x
         ; so i'll def need a buffer to store the objects i want to delete and do that at the end
     jmp @StartIteratingThroughGameObjects
 
@@ -2576,18 +2620,115 @@ JumpEngine:
 
 
 DrawEngine:
+    lda spriteBufferOffset
+    sta spriteBufferOffsetStart
     lda firstOccupiedSlot
-
+    cmp #objectMax                  ; ok we need to check here if firstOccupiedSlot points to object max. if so then there are no objects so I need to do some extra stuff to make sure I don't mess up the offset
+    beq @NoGameObjectsToDraw
+    jmp @AtLeastOneGameObject
 @DrawEngineLoopStart:
     cmp #objectMax
-    beq @DoneDrawing
+    beq @DoneDrawingObjects
+@AtLeastOneGameObject:
     tax 
-    lda objectNext,x 
-    sta stupidTemp
-    jsr DrawEngineJmp
+    lda objectNext,x     
+    sta stupidTemp          ; right now im storing the next index in stupid temp. i wonder if there is some sort of sequence where i don't need to but we shall see
+                                    ; so if i wanted to have all the logic here for every type of object. I would need some variable to determine which type it is, to then go to the correct table of draw data
+                                            ; that might be better. but for now. im going to have each object have its own draw function that is called but it will return the address of where the data is
+                                            ; again i honestly don't know which is better so lets just do this one cause its my idea and see
+
+    jsr DrawEngineJmp       ; this should set pointerLo and Hi to point to the table of spritemeta data
+    lda objectXPos,x        ; we store the x and y anchors to use for the relative sprite positions
+    sta temp1
+    lda objectYPos,x
+    sta temp2
+    ldy #$00                ; we can use y to get the data with indirect addressing
+    ; ldx #$00                ; and x can be used to store the data since we have spriteBufferLo and Hi set
+    ; now pointer hi and low should be set to the table of tiles and offsets
+    ldx spriteBufferOffset          ; we need to 
+@StoringOneSpriteFromObject:
+    
+    lda (pointerLo),y               ; this should be the y offset. the offest will never be FF so I'm using it as a terminator for sprites
+    cmp #$FF
+    beq @DoneDrawingThisObject
+    clc 
+    adc temp2
+    sta SPRITE_BUFFER_START,x
+    iny   
+
+    lda (pointerLo),y           ; this is the tile. should just take and place no problem
+    sta SPRITE_BUFFER_START + 1,x  
+    iny 
+
+    lda (pointerLo),y           ; this is the attribute. same thing take and place
+    sta SPRITE_BUFFER_START + 2,x
+    iny 
+
+    lda (pointerLo),y           ; this is the x offset. add it to fuck. negative numbers. I'll have to use the first byte to determine if its negative or not unless the position is always the top left but idk if that works
+    clc 
+    adc temp1 
+    sta SPRITE_BUFFER_START + 3,x
+    iny 
+    inx 
+    inx 
+    inx 
+    inx 
+    cpx #$00
+    bne @HaveNotLooped2
+    ldx #$40                ; starting address for object sprite dtata. but im assuming this will have to change
+@HaveNotLooped2:
+    ;stx spriteBufferOffset
+    jmp @StoringOneSpriteFromObject
+
+@DoneDrawingThisObject:
+    stx spriteBufferOffset
     lda stupidTemp
     jmp @DrawEngineLoopStart
-@DoneDrawing:
+
+
+
+@NoGameObjectsToDraw:
+    ldx spriteBufferOffset
+    jmp @StartClearingGarbage
+
+
+@DoneDrawingObjects:
+    ldx spriteBufferOffset
+    cpx spriteBufferOffsetStart
+    beq @DoneClearingGarbage
+   ; txa 
+  ;  clc 
+  ;  adc spriteBufferOffset
+  ;  tax 
+    ;   now we have to fill the rest with FE to clear garbage data
+@StartClearingGarbage:
+    lda #$FE
+@ClearingGarbageLoopStart:
+    sta SPRITE_BUFFER_START,x 
+    inx 
+    sta SPRITE_BUFFER_START,x 
+    inx 
+    sta SPRITE_BUFFER_START,x 
+    inx 
+    sta SPRITE_BUFFER_START,x 
+    inx 
+    cpx #$00
+    bne @HaveNotLooped3 
+    ldx #$40
+@HaveNotLooped3:
+    cpx spriteBufferOffsetStart
+    beq @DoneClearingGarbage
+    jmp @ClearingGarbageLoopStart
+
+@DoneClearingGarbage:
+    txa 
+    clc 
+    adc #$08
+    cmp #$40
+    bcs @HaveNotLooped4
+    lda #$40
+@HaveNotLooped4:
+    sta spriteBufferOffset
     rts 
 
 
@@ -2732,7 +2873,34 @@ DrawTextStatic:
   ;  tay 
     rts 
 
+DrawTextStatic2:
+    ; ok this is the improved version
+    ; we are going to use the animation offset that all game objects have to know which text table we want to display.
+                                        ; random thought, when do animation timers and such get updated? during this draw function? or when i guess its more important with like player character. this is def a thing that i'll understand better when im working on more complicated game objects
+    ldy objectAnimationOffset,x
+    lda TextTableLo,y 
+    sta pointerLo
+    lda TextTableHi,y 
+    sta pointerHi
 
+    ; this function should either return, or set one of my pointers to the address of the text table
+    rts 
+
+
+DeleteEngine:
+    ldx #$00
+@DeleteEngineLoopStart:
+    cpx deleteBufferOffset
+    beq @DoneDeletingGameObjects
+    lda OBJECT_DELETE_BUFFER,x
+    inx  
+    stx stupidTemp
+    tax 
+    jsr DeleteGameObject
+    ldx stupidTemp
+    jmp @DeleteEngineLoopStart
+@DoneDeletingGameObjects:
+    rts 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2792,12 +2960,20 @@ clearnametables:
 
     jsr InitializeGameObjectRam
     
+
+    ; this needs to be put in a initialize funtion my girl
     lda #$02
     sta spriteBufferHi
+    sta >spriteBuffer
     lda #$40
     sta spriteBufferLo
-
+    sta <spriteBuffer
+    lda #$00
+    sta deleteBufferOffset
     jsr loadpalettes 
+
+    lda #$40
+    sta spriteBufferOffset
 
     jsr loadSprites
     jsr updateSprites
@@ -2855,6 +3031,7 @@ Main:
 
     jsr ControllerLogic
 
+    jsr DeleteEngine
     jsr DrawEngine
 
     ;jsr CopyObjectRamToSpriteRam
@@ -2951,7 +3128,23 @@ TextTableHi:
 
 SampleText: ; count ( sets of 4 ), y pos offset, tile, att (prob 0), x pos offset, ...
     ; ok instead of count we read intil FE? cause i can't have y be 1
-    .byte $00, $D0, $00, $00,   $00, $D8, $00, $08, $FF
+    .byte       $00, $D0, $00, $00
+    .byte       $00, $D1, $00, $08
+    .byte       $00, $D2, $00, $10
+    .byte       $00, $D3, $00, $18
+    .byte       $00, $D4, $00, $20
+    .byte       $00, $D5, $00, $28
+    .byte       $00, $D6, $00, $30
+    .byte       $00, $D7, $00, $38
+    .byte       $00, $D8, $00, $40
+    .byte       $00, $D9, $00, $48
+    .byte       $00, $E0, $00, $50
+    .byte       $00, $E1, $00, $58
+    .byte       $00, $E2, $00, $60
+    .byte       $00, $E3, $00, $68
+    .byte       $00, $E4, $00, $70
+    .byte       $00, $E5, $00, $78 
+    .byte       $FF
                 ;     H                    I
 StandingAnimation:
     .byte $00, $00, $00, $00
