@@ -19,6 +19,8 @@
     ;; Variables
     pointerLo:      .res 1  ; pointer variables are declared in RAM
     pointerHi:      .res 1  ; low byte first, high byte immediately after
+    pointer2Lo:     .res 1
+    pointer2Hi:     .res 1
     jumpLo:         .res 1
     jumpHi:        .res 1
     gameObjectLo:   .res 1  ; pointer variables for storing the game objects in ram
@@ -40,7 +42,7 @@
     gameTime:       .res 2
     fifteenSeconds:      .res 1
     score:          .res 1
-    
+    currentGameObjectOffset:    .res 1
     temp1:          .res 1
     temp2:          .res 1
     stupidTemp:     .res 1
@@ -68,7 +70,8 @@
     controller1PreviousInput:   .res 1
     controller1Pressed:         .res 1
     controller1Held:            .res 1
-
+    playerState2:               .res 1
+    playerFaceingDirection:     .res 1
     playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
     playerAnimationCounter:             .res 1  
     ;; Constants
@@ -1590,16 +1593,16 @@ ToiletInteract:
     ; so
     ; wait 
     ; that code might not be useless...
-    lda bathroomFlag        ; could make this room flag and just be used by whatever room is loaded. 
-    cmp #$00
-    bne @ToiletInteractDone  ; text is still there. i don't want to reset the text timer cause idc
+  ;  lda bathroomFlag        ; could make this room flag and just be used by whatever room is loaded. 
+   ; cmp #$00
+   ; bne @ToiletInteractDone  ; text is still there. i don't want to reset the text timer cause idc
     ; jsr ToiletInteractSetSprites
     ; fucking a man
         ; should the toilet be a game object? or should it be some static thing in the room. fuck
             ; thats for later but will have to change this depending on my choice but when do i not have to redo code when i learn more better
     
     ; i'll have the text set the bathroomflag back to 0 when they realize they about to be deleted. obvi that a shit way but again. also it isn't that bad when its just 1 game obj instead of 1 per char
-    inc bathroomFlag
+  ;  inc bathroomFlag
 
     ; i need some loop to create the 4 characters
         ; it needs to set pointerLo and PointerHi to the right toiletLettersX
@@ -1647,6 +1650,13 @@ ToiletInteract:
     sta pointerHi
     jsr CreateGameObject2
 
+    lda #<(ToiletLetters2)
+    sta pointerLo
+    lda #>(ToiletLetters2)
+    sta pointerHi
+    jsr CreateGameObject2
+    
+
    
     ;; ok i still need to fix the data tables and create a gameloop function. but it seems like its working
 
@@ -1669,8 +1679,15 @@ ToiletInteract:
 .word ToiletLetters10
 ToiletLetters1: 
     ;      y  tile  att   x    hi  lo var ?
-    .byte $10, $D0, $00, $40, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic2, <DrawTextStatic2 - 1, $FF, $00, $00, $00, $00
-ToiletLetters2:
+    .byte $A0, $D0, $00, $40, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic2, <DrawTextStatic2 - 1, $FF, $00, $00, $00, $00
+
+ToiletLetters2: 
+    ;      y  tile  att   x    hi  lo var ?
+    .byte $90, $D0, $00, $10, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic2, <DrawTextStatic2 - 1, $80, $01, $01, $01, $01
+
+TestNPC1:
+   ; .byte $80, $D0, $00, $80, >TestNPCGameLoop, <TestNPCGameLoop - 1, >DrawTestNPC, DrawTestNPC - 1, $00, $00, $00, $00, $00
+ToiletLetters22:
     .byte $10, $D8, $00, $90, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $40 
 ToiletLetters3:
     .byte $10, $D9, $00, $A0, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, $A0 
@@ -1811,6 +1828,9 @@ ControllerLogic:
     
     
 
+TestNPCGameLoop:
+
+    rts 
 
 
 
@@ -2526,6 +2546,7 @@ CopyObjectRamToSpriteRam:
 GameEngine:
     lda #$00
     sta deleteBufferOffset
+    sta deleteFlag
     ; lets think about this sans jump engine. cause i think that is not what i need for the way this is set up. might be the thing i need later when im smarter. but right now my code aint set up for that bullllshit
 
     ; so. we need to iterate through all the game objects. and run their specific code.
@@ -2561,6 +2582,8 @@ GameEngine:
     stx deleteBufferOffset
 
 @DontDelete:
+    lda #$00
+    sta deleteFlag
     ldx stupidTemp ; i have to do this cause im deleting the game object and then that fucks up the linked list
     lda objectNext,x
         ; so i'll def need a buffer to store the objects i want to delete and do that at the end
@@ -2903,6 +2926,67 @@ DeleteEngine:
     rts 
 
 
+
+
+; Ok so the next thing I want to add is making the player character be multiple sprites, and then have animations based off those states.
+        ; this is going to probably be a major overhaul of how the player works, but again this is the meat of the shit. the game design is the easy part.
+; this should be just like every other draw function;
+    ; I get the animation offset, and the state? wait no the draw function would care not the drawengine. so here i use state. i didn't with text cause it has 1 state. I guess it could if i had it loaded but turned off.
+DrawPlayer:
+
+    ; first we use the state of the player 
+    ldx playerState2    ; im using player state 2 until im down reworking all the player shit
+    lda PlayerMetaSpriteDataLo,x 
+    sta pointerLo
+    lda PlayerMetaSpriteDataHi,x
+    sta pointerHi
+
+    ; based off the state, we then use the facing direction
+    lda playerFaceingDirection
+    asl 
+    tay 
+    lda (pointerLo),y
+    sta pointer2Lo
+    iny 
+    lda (pointerLo),y 
+    sta pointer2Hi
+
+    ; and finally based off that, we use the animation counter to finally store the sprite meta data address in pointerLo and pointerHi for the draw engine to write to OAM
+    lda playerAnimationCounter
+    and #$01
+    asl 
+    lda (pointer2Lo),y 
+    sta pointerHi
+    iny 
+    lda (pointer2Lo),y 
+    sta pointerLo
+ 
+    rts 
+
+PLAYER_TEST_SPRITE = $023C
+DrawPlayerBad:
+    jsr DrawPlayer
+    ldx #$00
+    ldy #$00
+
+    lda (pointerLo),y 
+    sta PLAYER_TEST_SPRITE,y
+    iny 
+    
+    lda (pointerLo),y 
+    sta PLAYER_TEST_SPRITE,y
+    iny 
+
+    lda (pointerLo),y 
+    sta PLAYER_TEST_SPRITE,y
+    iny 
+
+    lda (pointerLo),y 
+    sta PLAYER_TEST_SPRITE,y
+
+    rts 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RESET:
@@ -2972,6 +3056,9 @@ clearnametables:
     sta deleteBufferOffset
     jsr loadpalettes 
 
+    lda #$00
+    sta playerState2
+
     lda #$40
     sta spriteBufferOffset
 
@@ -3033,6 +3120,7 @@ Main:
 
     jsr DeleteEngine
     jsr DrawEngine
+    jsr DrawPlayerBad
 
     ;jsr CopyObjectRamToSpriteRam
 
@@ -3120,11 +3208,46 @@ DefaultObjectStartLo:
 DefaultObjectStartHi:
     .byte >ScottStartingData
 
+PlayerMetaSpriteDataLo:
+    .byte <PlayerStandingMetaSpriteData, <PlayerWalkingMetaSpriteData
+PlayerMetaSpriteDataHi:
+    .byte >PlayerStandingMetaSpriteData, >PlayerWalkingMetaSpriteData
 
+
+PlayerStandingMetaSpriteData:
+    .byte <PlayerStandingRightLeftMetaData, >PlayerStandingRightLeftMetaData, <PlayerStandingUpDownMetaData, >PlayerStandingUpDownMetaData
+PlayerWalkingMetaSpriteData:
+    .byte <PlayerWalkingRightLeftMetaData, >PlayerWalkingRightLeftMetaData, <PlayerWalkingUpDownMetaData, >PlayerWalkingUpDownMetaData
+
+
+PlayerStandingRightLeftMetaData:
+    .word PlayerStandingRightLeftMetaData1, PlayerStandingRightLeftMetaData2
+
+
+PlayerStandingRightLeftMetaData1:
+    .byte $00, $11, $00, $00            ; frame 1 of animation
+    .byte $FF
+PlayerStandingRightLeftMetaData2:
+    .byte $00, $21, $00, $00            ; frame 2
+    .byte $FF
+
+PlayerStandingUpDownMetaData:
+    .word PlayerStandingUpDownMetaData1, PlayerStandingUpDownMetaData1
+
+PlayerStandingUpDownMetaData1:
+    .byte $A0, $10, $00, $20
+    .byte $FF
+PlayerStandingUpDownMetaData2:
+    .byte $A0, $20, $00, $20
+    .byte $FF
+
+PlayerWalkingRightLeftMetaData:
+
+PlayerWalkingUpDownMetaData:
 TextTableLo:
-    .byte <SampleText
+    .byte <SampleText, <SampleText2
 TextTableHi:
-    .byte >SampleText
+    .byte >SampleText, >SampleText2
 
 SampleText: ; count ( sets of 4 ), y pos offset, tile, att (prob 0), x pos offset, ...
     ; ok instead of count we read intil FE? cause i can't have y be 1
@@ -3146,6 +3269,12 @@ SampleText: ; count ( sets of 4 ), y pos offset, tile, att (prob 0), x pos offse
     .byte       $00, $E5, $00, $78 
     .byte       $FF
                 ;     H                    I
+
+SampleText2:
+    .byte       $00, $D0, $00, $00
+    .byte       $08, $D1, $00, $00
+    .byte       $10, $D2, $00, $00
+    .byte       $FF
 StandingAnimation:
     .byte $00, $00, $00, $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
