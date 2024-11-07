@@ -46,6 +46,14 @@
     temp1:          .res 1
     temp2:          .res 1
     stupidTemp:     .res 1
+
+    minuteCounter:   .res 1      ; this should just count to 60? 
+    vblankCounter:  .res 2      ; this is the global timer. any system that requires times should use this to check if its time yet?
+    timerMinuteOffset:  .res 1
+    timerHourOffset:    .res 1
+    TIMER_MASK  = %10000000
+    
+    VBLANKS_PER_MINUTE = 60
      ; am i dumb or is this needed. like who fucking knows at this point. wait. other way is having tables 
         ; its always fucking tables. 
         ; should i just yolo table style first?
@@ -74,6 +82,7 @@
     playerFaceingDirection:     .res 1
     playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
     playerAnimationCounter:             .res 1  
+    playerAnimationCounter2:    .res 1
     ;; Constants
 
     distanceTestValueX:       .res 1
@@ -100,10 +109,17 @@
     JOYPAD_PORT2          = $4017
 
     SPRITE_RAM            = $0200
+    PLAYER_OAM_START      = $0207
     playerXpos            = $0207       ; sprite 1 x pos
     playerTile            = $0205
     playerAtt             = $0206
     playerYpos            = $0204       ; sprite 1 y pos
+
+    TIMER_OAM_START       = $0208
+    TIMER_OAM_HOUR_TENS = $0208
+    TIMER_OAM_HOUR_ONES = $020C
+    TIMER_OAM_MIN_TENS  = $0210
+    TIMER_OAM_MIN_ONES  = $0214    
 
     timerSpriteYpos       = $0208
     timerSpriteTile       = $0209
@@ -220,6 +236,19 @@
     firstOccupiedSlot:  .res 1
     lastOccupiedSlot:   .res 1
     freeRAMStart = $04      ; linked list of Free RAM slots stored 0400 - 04FF?
+
+
+    ; Declaring some static shit for tiles
+    ZERO        = $00
+    ONE         = $01
+    TWO         = $02
+    THREE       = $03
+    FOUR        = $04
+    FIVE        = $05
+    SIX         = $06
+    SEVEN       = $07
+    EIGHT       = $08
+    NINE        = $09
 
 .segment "CODE"
 
@@ -663,8 +692,63 @@ loadingZoneFound:
     sta temp1
     rts 
 
-    
+initializeGlobalTimer:
+    lda #$00
+    sta vblankCounter
+    sta timerMinuteOffset
+    sta timerHourOffset
+    rts 
 
+TimeEngine:
+    jsr IncrementGlobalTimer
+    jsr UpdateTimerOffsets
+    rts 
+
+;; I need to rethink my draw function. cause it breaks with a player. and it breaks with this. do I need to change the format a bit? hmmmm i'll tackle this tomorow
+DrawTimer:
+    ldx timerH
+    rts 
+
+IncrementGlobalTimer:
+    inc vblankCounter
+    bne @DoneIncrementingGlobalTimer
+    inc vblankCounter + 1
+@DoneIncrementingGlobalTimer:
+    rts 
+
+; ok so we are going to check against a mask. that should just rotate between 0100 0000 and 1000 0000
+; this should let us know every time 0100 0000 frames have passed. each time this happens we update the minute offset
+; if the minute offset rolls over we increment the hour offset. EZ
+; if hour rolls over i guess we just restart? I could just reinitialize the timer. or go into the night mode which i think is really cool so i want that way
+; we also need to flip the mask offset to swap between the two
+UpdateTimerOffsets:
+    ldx globalTimerOffset
+    lda TIMER_MASK,x 
+    and vblankCounter
+    bne @DoneUpdatingTimerOffsets
+    ; first lets get the offset set and stored
+    lda $01
+    eor globalTimerOffset
+    sta globalTimerOffset 
+    
+    ; then we need to inc the minutes offset and check for rollover
+            ; I want to spend time playing around with optimizing this eventually cause i feel like there is a super cool smart way but god bits are bullshit sometimes
+    inc timerMinuteOffset
+    lda #$04
+    cmp timerMinuteOffset
+    bne @DoneUpdatingTimerOffsets       ; the minute has not rolled over so we done
+    ldy #$00
+    sty timerMinuteOffset           
+
+    inc timerHourOffset
+    lda #$0C                            ; this 12 
+    bne @DoneUpdatingTimerOffsets
+    sty timerHourOffset 
+@DoneUpdatingTimerOffsets:
+    rts 
+
+TIMER_MASK:
+    .byte %01000000, %10000000
 
 Timer:
     ;; increase time value each frame
@@ -2954,12 +3038,22 @@ DrawPlayer:
     ; and finally based off that, we use the animation counter to finally store the sprite meta data address in pointerLo and pointerHi for the draw engine to write to OAM
     lda playerAnimationCounter
     and #$01
+  ;  cmp #$0F
+  ;  lda playerAnimationCounter2
+ ;   bne @dontSwap 
+  ;  clc 
+  ;  adc #$01
+ ;   and #$01
+  ;  ora #$01
+
+@dontSwap:
     asl 
-    lda (pointer2Lo),y 
-    sta pointerHi
-    iny 
+    tay 
     lda (pointer2Lo),y 
     sta pointerLo
+    iny 
+    lda (pointer2Lo),y 
+    sta pointerHi
  
     rts 
 
@@ -2986,6 +3080,20 @@ DrawPlayerBad:
 
     rts 
 
+
+; this is supposed to be a generic game object drawing subroutine
+; it will basically be the same as the player
+    ; i think I need to have like, another table that has each gameobject type first?
+    ; which is that better or should each game object have its own draw function? 
+        ; i mean how many types do i have? human? player? text? clock? score? ui? 
+; ok fuck the generic. lets draw the clock, could possibly be turned into draw UI or something. which would be cool
+FIFTEEN_SECONDS = %01000000
+
+; ok so I have 3 variables holding the offsets for the ROM metasprite tables
+DrawClock:
+
+    rts 
+    
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3107,6 +3215,7 @@ Main:
     and #%11111101          ; clear the nmi flag
     sta flag1
 
+    jsr IncrementGlobalTimer
     jsr Timer2
     jsr ReadController1
     jsr PlayerLogic
@@ -3225,10 +3334,10 @@ PlayerStandingRightLeftMetaData:
 
 
 PlayerStandingRightLeftMetaData1:
-    .byte $00, $11, $00, $00            ; frame 1 of animation
+    .byte $A0, $11, $00, $20            ; frame 1 of animation
     .byte $FF
 PlayerStandingRightLeftMetaData2:
-    .byte $00, $21, $00, $00            ; frame 2
+    .byte $A0, $21, $00, $20            ; frame 2
     .byte $FF
 
 PlayerStandingUpDownMetaData:
@@ -3275,6 +3384,36 @@ SampleText2:
     .byte       $08, $D1, $00, $00
     .byte       $10, $D2, $00, $00
     .byte       $FF
+
+
+;; the numbers as words should be the tile location for that number. the code of that is somehwere else maybe at the top.
+; this should make it easier when I eneiviatbly change the chr file
+TIMER_X_ANCHOR  = $10
+TIMER_Y_ANCHOR  = $10
+COLON = $0A ; this is a placeholder i don't have a colon sprite.
+TimerHourMetaSpriteTable:
+    .byte   $00, ZERO,  $00, $00,       $00, ZERO,    $00, $08,         $00, COLON, $00, $10,       $FF 
+    .byte   $00, ZERO,  $00, $00,       $00, ONE,     $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, TWO,     $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, THREE,   $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, FOUR,    $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, FIVE,    $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, SIX,     $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, SEVEN,   $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, EIGHT,   $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ZERO,  $00, $00,       $00, NINE,    $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ONE,   $00, $00,       $00, ZERO,    $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ONE,   $00, $00,       $00, ONE,     $00, $08,         $00, COLON, $00, $10,       $FF
+    .byte   $00, ONE,   $00, $00,       $00, TWO,     $00, $08,         $00, COLON, $00, $10,       $FF
+
+
+TimerMinuteMetaSpriteTable:
+    .byte   $00, ZERO,  $00, $18,       $00, $00, ZERO, $00, $20,       $FF
+    .byte   $00, ONE,   $00, $18,       $00, $00, FIVE, $00, $20,       $FF
+    .byte   $00, THREE, $00, $18,       $00, $00, ZERO, $00, $20,       $FF
+    .byte   $00, FOUR,  $00, $18,       $00, $00, FIVE, $00, $20,       $FF
+
+
 StandingAnimation:
     .byte $00, $00, $00, $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
