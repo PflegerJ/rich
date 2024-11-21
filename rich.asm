@@ -46,12 +46,16 @@
     temp1:          .res 1
     temp2:          .res 1
     stupidTemp:     .res 1
-
+    currentX:       .res 1
+    currentY:       .res 1
     minuteCounter:   .res 1      ; this should just count to 60? 
     vblankCounter:  .res 2      ; this is the global timer. any system that requires times should use this to check if its time yet?
     timerMinuteOffset:  .res 1
     timerHourOffset:    .res 1
-    TIMER_MASK  = %10000000
+    globalTimerOffset:  .res 1
+    GAME_OBJECT_OFFSET: .res 8 ; this should be object max, it will be the offsets for the game objects. this will be shuffled each frame to make drawing easier 
+    gameObjectCounter:  .res 1
+    ;TIMER_MASK  = %10000000
     
     VBLANKS_PER_MINUTE = 60
      ; am i dumb or is this needed. like who fucking knows at this point. wait. other way is having tables 
@@ -704,9 +708,10 @@ TimeEngine:
     jsr UpdateTimerOffsets
     rts 
 
+
 ;; I need to rethink my draw function. cause it breaks with a player. and it breaks with this. do I need to change the format a bit? hmmmm i'll tackle this tomorow
 DrawTimer:
-    ldx timerH
+   ; ldx timerH
     rts 
 
 IncrementGlobalTimer:
@@ -2242,6 +2247,7 @@ InitializeGameObjectRam:
 ; 
     
     ldy #$00
+    sty gameObjectCounter
     lda #$01
     sty firstFreeSlot   ; setting firstFreeSlot as 0 because that is the first free slot at startup. 
     ; then lets do the loop and fill each objectNext value to point at the next object
@@ -2342,6 +2348,18 @@ InitializeGameObjectRam:
     sta objectState,x    ; state
     iny 
 
+
+    ; I am also going to have an array of current offsets to help the draw function randomize the sprite prio order each frame
+    ; gameObjCounter is my offset of offsets
+    ; it should be pointing at the next open slot
+    ; i should not be at this code if i have max game objects so no error checking baby
+    inc gameObjectCounter
+    txa 
+    ldx gameObjectCounter
+    sta GAME_OBJECT_OFFSET,x 
+    tax 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
     ;objectXPos = spriteRamStart + objectMax * 1
@@ -2413,6 +2431,50 @@ InitializeGameObjectRam:
 ; THIS ASSUMES X REG already has the slot we are deleting
 DeleteGameObject:
 
+    ; before we do any deleting of the obj data
+    ; ima delete the offset from the GAME_OBJ_OFFSET array
+    ; which is finding the element in the un-ordereed list
+    ; and then shifting all the elements behind it
+    ; fucking hacker rank bullshit
+    ; so what are the cases
+        ; first element
+            ; first and only
+            ; other elements in list
+        ; middle element
+        ; last element
+            ; first and last
+            ; just regular last
+    ; i know there is some simple ass logic that covers multiple cases
+    
+    txa         ; target is now A reg
+    pha 
+    ldy #$00        ; y is our offset to access the data
+
+@StartDeletingOffsetLoop:
+    cmp GAME_OBJECT_OFFSET,y 
+    beq @TargetOffsetFound
+    iny 
+    jmp @StartDeletingOffsetLoop    ; no error checking. we will only delete game objects that exist. so thats what it is
+
+@TargetOffsetFound:
+    dec gameObjectCounter
+    tya     ; y is holding n
+    tax     ; x is holding n + 1
+    inx 
+
+@ShufflingOffsetsForwardLoop:
+    cpy gameObjectCounter                      ; if y is the same as the new decremented gameObjectCounter, we are at the end of the list and don't need to shuffle elements forward
+    beq @DoneDeletingGameObjectOffset
+    lda GAME_OBJECT_OFFSET,x 
+    sta GAME_OBJECT_OFFSET,y 
+    iny 
+    inx 
+    jmp @ShufflingOffsetsForwardLoop  
+
+@DoneDeletingGameObjectOffset:
+    pla 
+    tax 
+    
     ; WE ARE ASSUMING X is the game object we are deleting?
     ; so what are the scenarios?
 
@@ -2838,6 +2900,47 @@ DrawEngine:
     sta spriteBufferOffset
     rts 
 
+; this we have to assume we have pointerLo set up
+; we are also assuming anchorX and anchorY have been set up.
+; this also doesn't care about sprite 0. somehow? how do i fix this issue
+; so all we have to do is grab the data and place it at SPRITE_BUFFER_START,spriteBufferOffset
+; we need to store the new offset
+; i made variables currentX and currentY. i feel like im dancing around the really effiencnt cool way to do this but i haven't landed on it quite yet
+DrawMetaSprite:
+    ldx spriteBufferOffset
+    ldy #$00
+
+    ; god why is this so fucking hard
+    ; I also need to think about flipping sprites. 
+        ; right now i probably only need to flip horizontally
+    lda (pointerLo),y   ; y postition
+            
+    clc 
+    adc currentY 
+    sta SPRITE_BUFFER_START,x 
+    iny 
+    inx 
+
+    lda (pointerLo),y   ; tile 
+    sta SPRITE_BUFFER_START,x 
+    iny 
+    inx 
+
+    lda (pointerLo),y   ; att
+    sta SPRITE_BUFFER_START,x 
+    iny 
+    inx 
+
+    lda (pointerLo),y   ; x postition
+    clc 
+    adc currentX 
+    sta SPRITE_BUFFER_START,x 
+    iny 
+    inx
+
+    lda (pointerLo),y ; will be FF to say its done 
+
+    rts 
 
 DrawEngineJmp:
     lda objectDrawHi,x 
@@ -3166,6 +3269,7 @@ clearnametables:
 
     lda #$00
     sta playerState2
+    sta globalTimerOffset
 
     lda #$40
     sta spriteBufferOffset
@@ -3392,7 +3496,6 @@ TIMER_X_ANCHOR  = $10
 TIMER_Y_ANCHOR  = $10
 COLON = $0A ; this is a placeholder i don't have a colon sprite.
 TimerHourMetaSpriteTable:
-    .byte   $00, ZERO,  $00, $00,       $00, ZERO,    $00, $08,         $00, COLON, $00, $10,       $FF 
     .byte   $00, ZERO,  $00, $00,       $00, ONE,     $00, $08,         $00, COLON, $00, $10,       $FF
     .byte   $00, ZERO,  $00, $00,       $00, TWO,     $00, $08,         $00, COLON, $00, $10,       $FF
     .byte   $00, ZERO,  $00, $00,       $00, THREE,   $00, $08,         $00, COLON, $00, $10,       $FF
