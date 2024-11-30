@@ -3152,6 +3152,55 @@ DrawClock:
 
 
 
+
+
+
+DrawEngine2:
+    lda #$40
+    sta spriteBufferOffset
+    ; lets focus on just getting game objects drawn fuck everything else right now
+    lda #$00
+@DrawEngine2LoopStart:
+    cmp gameObjectCounter
+    beq @DoneDrawingGameObjects2
+
+    ; we need to get the next game object offset
+    tax 
+    lda GAME_OBJECT_OFFSET,x
+    sta currentGameObjectOffset     ; storing the current game object offset
+    tay 
+    stx stupidTemp
+    jsr DrawEngineJmp2
+    inc stupidTemp
+    lda stupidTemp
+    jmp @DrawEngine2LoopStart
+
+@DoneDrawingGameObjects2:
+    ; need to write FE till we reach the end to clear garbage
+    ldx spriteBufferOffset
+    lda #$FE
+@ClearingGarbageLoopStart2:
+    cpx #$00
+    beq @DoneClearingGarbage2
+    sta SPRITE_BUFFER_START,x 
+    sta SPRITE_BUFFER_START + 1,x 
+    sta SPRITE_BUFFER_START + 2,x 
+    sta SPRITE_BUFFER_START + 3,x 
+    inx 
+    inx 
+    inx 
+    inx 
+    jmp @ClearingGarbageLoopStart2
+@DoneClearingGarbage2: 
+    rts 
+
+DrawEngineJmp2:
+    lda objectDrawLo,y 
+    pha 
+    lda objectDrawHi,y  
+    pha 
+    rts 
+
 ; ok god
 ; we are going to assume:   
             ; that the sprite shuffler will take care of priority
