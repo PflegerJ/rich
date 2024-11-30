@@ -187,7 +187,7 @@
 
     bathroomToiletSpriteStart = $0238
     
-    SPRITE_RAM_START        = $0240  ; which sprite ram start is this? god damn it jabes, this is where i put the sprite data from game objects
+    SPRITE_RAM_START        = $40       ; this is used to store 
     SPRITE_BUFFER_START     = $0200     ; this is what I'm using now. its where the sprites for game objects starts
     scottDataStartLo: .res 1
     scottDataStartHi: .res 1
@@ -214,8 +214,8 @@
     objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
     objectXPos = spriteRamStart + objectMax * 1
     objectYPos = spriteRamStart + objectMax * 2
-    objectTile = spriteRamStart + objectMax * 3
-    ; objectVar2 = spriteRamStart + objectMax * 3     this should replace tile since we will have a draw function so no tile needed
+    ;objectTile = spriteRamStart + objectMax * 3
+    objectVar3 = spriteRamStart + objectMax * 3     ;this should replace tile since we will have a draw function so no tile needed
     objectAtt = spriteRamStart + objectMax * 4
     objectVar1 = spriteRamStart + objectMax* 5
     objectHi = spriteRamStart + objectMax * 6
@@ -2312,7 +2312,7 @@ InitializeGameObjectRam:
     sta objectYPos,x 
     iny 
     lda (pointerLo),y   ; tile
-    sta objectTile,x 
+    sta objectVar3,x 
     iny 
     lda (pointerLo),y   ; att
     sta objectAtt,x 
@@ -2353,12 +2353,12 @@ InitializeGameObjectRam:
     ; gameObjCounter is my offset of offsets
     ; it should be pointing at the next open slot
     ; i should not be at this code if i have max game objects so no error checking baby
-    inc gameObjectCounter
+    
     txa 
     ldx gameObjectCounter
     sta GAME_OBJECT_OFFSET,x 
     tax 
-
+    inc gameObjectCounter
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
@@ -2594,88 +2594,7 @@ DeleteGameObject:
 ; so. i need to take into account where to start. cause things like timers and shit. unless i load those into ram but idk if i need to. i think they are their own thing?
 
 
-; this function is written to work for now. but we have to be overhauled when game objects start to have more than one tile associated with them.
-    ; i'll have to write draw functions for each and then figure out a buffer
-    ; it seems like people have implemented buffers in their games for shit so i think its a solid idea. just don't know how bigg and how many and what overhead they require
-        ; addressHi, addressLo, count, data, data.... is one idea
-            ; having the address means it can be more generic. 
-                ; i wonder if I could turn all my tables into a format that would work with the buffer?
-                ; at least it would streamline some of the handling of data
-                    ; not sure if there is any actual benefit but its something to consider down the road
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
-    ;objectXPos = spriteRamStart + objectMax * 1
-    ;objectYPos = spriteRamStart + objectMax * 2
-    ;objectTile = spriteRamStart + objectMax * 3
-    ;objectAtt = spriteRamStart + objectMax * 4
-    ;objectVar1 = spriteRamStart + objectMax* 5
-    ;objectHi = spriteRamStart + objectMax * 6
-    ;objectLo = spriteRamStart + objectMax * 7
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ; I'm stupid I don't need the other variables even for this stupid version. This is just display info which only uses y pos, tile, att, x pos
-CopyObjectRamToSpriteRam:
-    
-    ldx #$00
-    ldy firstOccupiedSlot
-
-@SpriteCopyLoopStart:    
-    cpy #objectMax
-    beq @WritingFE
-
-    lda objectYPos,y
-    sta SPRITE_RAM_START,x
-    inx 
-    lda objectTile,y 
-    sta SPRITE_RAM_START,x 
-    inx 
-    lda objectAtt,y 
-    sta SPRITE_RAM_START,x
-    inx 
-    lda objectXPos,y 
-    sta SPRITE_RAM_START,x
-    inx 
-    
-    lda objectNext,y 
-    tay 
-    jmp @SpriteCopyLoopStart
-
-; ok we need to also copy $FE to the rest of the space in case there is sprite data from a deleted sprite that isn't overwritten with new sprite data
-
-    ;so if x is 20 * 5 = 100. which is... $64 
-    ; wait var count doesn't matter. cause its just 4 per right? caused its 4 bytes per.
-    ; if x is that, then we are at the end of ram space for game objects. so we are done over writing possible junk with $FE
-            ; oh idea....
-                ; what if we only over write when we delete a game object?
-                ; that seems like it either would actually suck 
-                    ; only make a difference if i delete a lot of things a lot, or some other niche way the game plays out and im not sure
-                    ; or be really cool and quick and smart and make me look like a genius
-                ; def worth looking into. I can always count the CCs or might only be able to know after I see how many and how often im creating and deleting game objects.
-
-; when gameobjects have their own write functions that fill a buffer this will be not needed 
-@WritingFE:             
-    lda #$FE
-
-    ; I "unrolled" this loop. I remember reading about it in hardware class and i saw it online which reminded me about it
-        ; i think it works, since each object is 4 bytes, i should be able to write FE in groups of 4 without ever leaving garbage or overwriting where I shouldn't be
-
-    ; this whole part has 0 error checking so far i'm honestly weirdly brain fried right now yolo 
-@WritingFELoop:
-    cpx #objectMax * 4
-    beq @DoneCopyingSpriteData
-    sta SPRITE_RAM_START, x         ; I need to write FE ( variable count ) * ( objectMax - Number of Ga,me Objects in Ram )
-    inx                                 ; but its 8 times per object slot since we are running ith 8 variables
-    sta SPRITE_RAM_START, x     ; wait
-    inx                             ; I don't copy over all this data its just the display info so I don't need to do it 8 times or whatever I'm stupid
-    sta SPRITE_RAM_START, x
-    inx 
-    sta SPRITE_RAM_START, x
-    inx 
-    jmp @WritingFELoop 
-
-@DoneCopyingSpriteData:
-    rts 
 
 
 ; the big boy
@@ -3113,6 +3032,14 @@ DeleteEngine:
     rts 
 
 
+; so i have no clue how to do this smartly
+; my only idea right now is just shifting things like 3 % objectmax indexes? idk
+ShuffleGameObjects:
+
+    ; first we need some sort of rng
+    lda vblankCounter   ; right now we using the global timer. im not sure what a better way right now if there is one
+  ; im too tired ill finish this laters    ; this will make it be within range
+    rts 
 
 
 ; Ok so the next thing I want to add is making the player character be multiple sprites, and then have animations based off those states.
@@ -3196,7 +3123,146 @@ FIFTEEN_SECONDS = %01000000
 DrawClock:
 
     rts 
+
+; ok lets do this one more time baby
+;DrawEngine2:
     
+    ; this time we will be iterating through the game object offsets in the offset array
+    ; i still need to write the shuffling thing for them..
+
+    ;lda #SPRITE_BUFFER_START    ; reset offset to be at where I want to start putting game object sprite data
+   ; sta spriteBufferOffset
+
+   ; ldx #$00
+;@DrawEngine2LoopStart:
+   ; lda GAME_OBJECT_OFFSET,x 
+   ; cmp gameObjectCounter              ; gameObjectCounter is the index of the first empty slot or 1 past end so we iterate till we reach it
+   ; beq @DoneDrawingGameObjects
+   ; sta currentGameObjectOffset
+   ; tax 
+   ; sta stupidTemp                  ; why do i write code this fucking tired
+  ;  inc stupidTemp  ; please god be sorta right  
+  ;  jsr DrawEngineJmp2
+  ;  ldx stupidTemp
+  ;  jmp @DrawEngine2LoopStart
+
+;@DoneDrawingGameObjects:
+   ; rts 
+
+
+
+
+; ok god
+; we are going to assume:   
+            ; that the sprite shuffler will take care of priority
+            ; that we have space to write all 6 sprites to OAM
+            ; that we have the sprite ram offset set for this sprite to use
+
+; ok ok
+; so what do we need to do:
+            ; we need to check facing direction to know if horizontal offsets are postive or negative
+            ; check state - first probably. if walking standing or something....
+                ; lets just use var1 for state and var2 for facing dir? could combine them to save space but not sure if that is what I need to do right now
+            ; use anchor position, facing direction, and sprite meta data table to know where each sprite goes in relation to anchor
+            ; place sprites in OAM
+            ; we also need to know which table to get the meta sprite data from. if i have multiple people, they all need their respective tables unless they look exactly the same.
+
+
+; what is the flow
+            ; one option which i think is the best way, is to do tables of tables again.
+            ; so
+            ; first we get the state, use that to
+DrawPerson:
+    ; first we need to know the state which is var1
+    ldx currentGameObjectOffset     ; we will use x to store the current game obj offset to access the data
+
+    ldy objectVar1,x                ; we get the state of the person and use that to get the TableOfPeopleSTATE:
+    lda TableOfPeopleStatesHi,y
+    sta pointerHi
+    lda TableOfPeopleStatesLo,y 
+    sta pointerLo 
+
+    ; we beed to multiply each offset by 2 for the rest of the pointers
+        ; don't need to do the first cause its split hi and lo
+
+    lda objectVar3,x                   ; we are assuming var3 will hold the person offset. but god i might need 4 variables now
+    asl 
+    tay 
+    lda (pointerLo),y
+    sta pointer2Lo
+    lda (pointerLo + 1),y
+    sta pointer2Hi
+
+    lda objectVar2,x        ; this is getting the table of person X, state Y, facing dir Z
+    asl 
+    tay 
+    lda (pointer2Lo),y
+    sta pointerLo
+    lda (pointer2Lo + 1),y 
+    sta pointerHi
+
+    lda objectAnimationOffset,x ; this is getting the actual meta sprite table address
+    asl 
+    tay 
+    lda (pointerLo),y 
+    sta pointer2Lo
+    lda (pointerLo + 1),y 
+    sta pointer2Hi
+
+    ; brute force it jabes, don't care about efficiency rn
+
+    ; I am doing it dumb and having 4 tables for each facing dir. idc i'll fix it later
+    ; so basically we should not give a shit now and just take info. add to anchor and move on
+    ; ima read it normally, left to right top down so..
+        ; 1 2
+        ; 3 4
+        ; 5 6
+
+    lda objectXPos,x            ; this might be done by the draw engine idk
+    sta currentX
+    lda objectYPos,x 
+    sta currentY
+
+    ldx spriteBufferOffset      ; offset to write the data
+    ldy #$00                    ; offset to access the sprite meta data
+@DrawPersonLoopStart:
+    lda (pointer2Lo),y          ; y pos
+    clc 
+    adc currentY
+    sta SPRITE_BUFFER_START,x 
+
+    
+    lda (pointer2Lo + 1),y          ; tile
+    sta SPRITE_BUFFER_START + 1,x 
+    
+    lda (pointer2Lo + 2),y          ; att
+    sta SPRITE_BUFFER_START + 2,x 
+
+    lda (pointer2Lo + 3),y          ; x pos
+    clc  
+    adc currentX
+    sta SPRITE_BUFFER_START + 3,x 
+
+    iny 
+    iny 
+    iny     
+    iny 
+    inx 
+    inx 
+    inx 
+    inx 
+
+    cpy #24         ; 6 sprites, 4 bytes each so at 24 we should be done
+    bne @DrawPersonLoopStart
+
+    stx spriteBufferOffset
+    rts 
+
+; tableOfPeopleStates (state offset):                       <standing, <walking          
+; tableOfPeopleStanding (var3 offset):                      <person1Standing, >person1Standing, <person2Standing, ...
+; tableOfPerson1Standing (facing dir):                      <person1StandingUp, >person1StandingUp, <person1StandingLeftRight, >person1StandingLeftRight
+; tableOfPerson1StandingUp (animation offset):              <frame1, <frame2, <frame3, ...
+; metaSpriteDataOfPerson1StandingFrame1:    ypos, tile, att, xpos
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3515,6 +3581,53 @@ TimerMinuteMetaSpriteTable:
     .byte   $00, ONE,   $00, $18,       $00, $00, FIVE, $00, $20,       $FF
     .byte   $00, THREE, $00, $18,       $00, $00, ZERO, $00, $20,       $FF
     .byte   $00, FOUR,  $00, $18,       $00, $00, FIVE, $00, $20,       $FF
+
+
+
+
+; Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
+
+TableOfPeopleStatesLo:
+    .byte <TableOfPeopleStanding 
+TableOfPeopleStatesHi:
+    .byte >TableOfPeopleStanding
+
+TableOfPeopleStanding:
+    .byte <Person1Standing, >Person1Standing
+ 
+Person1Standing:
+    .byte  <Person1StandingDown, >Person1StandingDown, <Person1StandingLeft, >Person1StandingLeft, <Person1StandingUp, >Person1StandingUp, <Person1StandingRight, >Person1StandingRight
+Person1StandingDown:
+    .byte <Person1StandingDownFrame1, >Person1StandingDownFrame1, <Person1StandingDownFrame2, >Person1StandingDownFrame2
+Person1StandingLeft:
+    .byte <Person1StandingLeftFrame1, >Person1StandingLeftFrame1, <Person1StandingLeftFrame2, >Person1StandingLeftFrame2
+Person1StandingUp:
+    .byte <Person1StandingUpFrame1, >Person1StandingUpFrame1, <Person1StandingUpFrame2, >Person1StandingUpFrame2
+Person1StandingRight:
+    .byte <Person1StandingRightFrame1, >Person1StandingRightFrame1, <Person1StandingRightFrame2, >Person1StandingRightFrame2
+
+Person1StandingDownFrame1:
+    .byte $00, $00, $00, $00
+Person1StandingDownFrame2:
+    .byte $00, $00, $00, $00
+
+Person1StandingLeftFrame1:
+    .byte $00, $00, $00, $00
+Person1StandingLeftFrame2:
+    .byte $00, $00, $00, $00
+
+Person1StandingUpFrame1:
+    .byte $00, $00, $00, $00
+Person1StandingUpFrame2:
+    .byte $00, $00, $00, $00
+
+Person1StandingRightFrame1:
+    .byte $00, $00, $00, $00
+Person1StandingRightFrame2:
+    .byte $00, $00, $00, $00
+
+
+
 
 
 StandingAnimation:
