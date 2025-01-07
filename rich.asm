@@ -97,6 +97,18 @@
     beerCount:                   .res 1      ; first half is cigs, 2nd beer bits: 0123 | 4567
     cigCount:                   .res 1
 
+    ;;; player variables ;;; will clean up any player variable that is above this line when done with this shit
+
+    playerState:                .res 1
+    playerXPos:                 .res 1
+    playerSFloat:               .res 1
+    playerYPos:                 .res 1
+    playerYFloat:               .res 1
+    playerFacingDir:            .res 1
+    playerAnimationOffset:      .res 1
+    playerAnimationTimer:       .res 1
+    playerSpeed:                .res 1
+
     OBJECT_DELETE_BUFFER  = $30
     PPU_CTRL_REG1         = $2000
     PPU_CTRL_REG2         = $2001
@@ -3151,11 +3163,14 @@ DrawClock:
 
 
 
-
+DrawPlayer2:
+    rts 
 
 
 
 DrawEngine2:
+    jsr DrawPlayer2
+
     lda #$40
     sta spriteBufferOffset
     ; lets focus on just getting game objects drawn fuck everything else right now
@@ -3201,6 +3216,15 @@ DrawEngineJmp2:
     pha 
     rts 
 
+
+
+   ;      y  tile  att   x    hi  lo var ?
+   ; .byte $A0, $D0, $00, $40, >ToiletLetterGameLoop, <ToiletLetterGameLoop - 1, >DrawTextStatic2, <DrawTextStatic2 - 1, $FF, $00, $00, $00, $00
+
+
+TestPerson1:
+    ;       y       var3    att     x   hi_gameloop     lo_gameloop     hi_Draw     lo_darw     var1    var2    ani_offset      ani_timer   state
+    .byte   $80    
 ; ok god
 ; we are going to assume:   
             ; that the sprite shuffler will take care of priority
@@ -3225,7 +3249,7 @@ DrawPerson:
     ; first we need to know the state which is var1
     ldx currentGameObjectOffset     ; we will use x to store the current game obj offset to access the data
 
-    ldy objectVar1,x                ; we get the state of the person and use that to get the TableOfPeopleSTATE:
+    ldy objectState,x                ; we get the state of the person and use that to get the TableOfPeopleSTATE:
     lda TableOfPeopleStatesHi,y
     sta pointerHi
     lda TableOfPeopleStatesLo,y 
