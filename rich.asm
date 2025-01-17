@@ -1241,7 +1241,7 @@ JumpEngine:
     ; use state as the offset, and then jump to the subroutine 
             ; how the fuck do i do movement with like acceleration and shit...
 
-
+;test
 PlayerLogic:
 
     ldx playerState
