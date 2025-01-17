@@ -82,11 +82,11 @@
     controller1PreviousInput:   .res 1
     controller1Pressed:         .res 1
     controller1Held:            .res 1
-    playerState2:               .res 1
-    playerFaceingDirection:     .res 1
-    playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
-    playerAnimationCounter:             .res 1  
-    playerAnimationCounter2:    .res 1
+   ; playerState2:               .res 1
+    ;playerFaceingDirection:     .res 1
+    ;playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
+    ;playerAnimationCounter:             .res 1  
+    ;playerAnimationCounter2:    .res 1
     ;; Constants
 
     distanceTestValueX:       .res 1
@@ -104,7 +104,7 @@
     playerSFloat:               .res 1
     playerYPos:                 .res 1
     playerYFloat:               .res 1
-    playerFacingDir:            .res 1
+    playerFacingDirection:      .res 1
     playerAnimationOffset:      .res 1
     playerAnimationTimer:       .res 1
     playerSpeed:                .res 1
@@ -124,12 +124,22 @@
     JOYPAD_PORT1          = $4016
     JOYPAD_PORT2          = $4017
 
-    SPRITE_RAM            = $0200
-    PLAYER_OAM_START      = $0207
-    playerXpos            = $0207       ; sprite 1 x pos
-    playerTile            = $0205
-    playerAtt             = $0206
-    playerYpos            = $0204       ; sprite 1 y pos
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;       SPRITE OAM ADDRESSES
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    SPRITE_OAM_START                = $0200     ; start of OAM address space 0200 - 02ff
+    UI_OAM_START                    = $0200     ; UI will be the first sprite slots i guess. something something sprite 0 hits something something
+    PLAYER_OAM_START                = $0220     ; randomly chose this
+    GAME_OBJECT_OAM_START           = $0240     ; i want this to be as big as possible. just depends on how many UI sprites I will need
+    GAME_OBJECT_OAM_OFFSET_START    = #$40
+
+
+
 
     TIMER_OAM_START       = $0208
     TIMER_OAM_HOUR_TENS = $0208
@@ -200,58 +210,49 @@
     bathroomToiletSpriteStart = $0238
     
     SPRITE_RAM_START        = $40       ; this is used to store 
-    SPRITE_BUFFER_START     = $0200     ; this is what I'm using now. its where the sprites for game objects starts
+         ; this is what I'm using now. its where the sprites for game objects starts
     scottDataStartLo: .res 1
     scottDataStartHi: .res 1
-    ;; Game Engine shit
-    spriteRamStart = $0300  ; what the fuck is this naming convention? this is where i store game object data
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;       Game Object Constants and Addressses
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    GAME_OBJECT_RAM_START = $0300  
     objectMax = 8
     variableCount = 16
-  ;  object_y_pos = spriteramstart + object_max*0
-   ; object_tile = spriteramstart +object_max*1
-   ; object_att = spriteramstart + object_max*2
-   ; object_x_pos = spriteramstart + object_max*3
-   ; object_script_lo = spriteramstart + object_max*4
-   ; object_script_hi = spriteramstart + object_max *5
-   ; object_var_1 = spriteramstart + object_max * 6
-   ; object_var_2 = spriteramstart + object_max * 7
-    
-    ; in the future will I need all these vars? 
-    ; i guess will draw functions help reduce the vars needed? or maybe i can just assume Att is 00 or something
-        ; but also each sprite won't take up a game object slot.
 
+    objectNext = GAME_OBJECT_RAM_START + objectMax * 0 ; ok we are going to try this implementation i guess
 
-    ; so part of the overhead of using this system of memory managment is each game object requires an additional variable. which limits how much data they can store
-        ; cause right now i can only have 1 var slot
-    objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
-    objectXPos = spriteRamStart + objectMax * 1
-    objectYPos = spriteRamStart + objectMax * 2
-    ;objectTile = spriteRamStart + objectMax * 3
-    objectVar3 = spriteRamStart + objectMax * 3     ;this should replace tile since we will have a draw function so no tile needed
-    objectAtt = spriteRamStart + objectMax * 4
-    objectVar1 = spriteRamStart + objectMax* 5
-    objectHi = spriteRamStart + objectMax * 6
-    objectLo = spriteRamStart + objectMax * 7
+    objectXPos = GAME_OBJECT_RAM_START + objectMax * 1
+    objectXPosFloat = GAME_OBJECT_RAM_START + objectMax * 2
 
-    ; these aren't implemented into the game engine side but i want them here while i start thinking about it with scott stuff
-    
-    objectXPosFloat = spriteRamStart + objectMax * 8
-    objectYPosFloat = spriteRamStart + objectMax * 9
-    objectDrawHi = spriteRamStart + objectMax * 10
-    objectDrawLo = spriteRamStart + objectMax * 11
-    objectVar2 = spriteRamStart + objectMax * 12
-    objectAnimationOffset = spriteRamStart + objectMax * 13    ; im thinkin
-    objectAnimationTimer = spriteRamStart + objectMax * 14
-    objectState = spriteRamStart + objectMax * 15
-    ; I might need 16 bytes per game object. or use some zero page values to store the info of the current object I'm working on. but like speed and shit i never even considered.
-        ; In my shit current game speed isn't a thing. but having 16 ( 15 really cause 1 is next ) variables would give me any wiggle room
-            ; but it might just be too much space
-        ; I could maybe get away with 12 variables? that would give me 21 game objects instead of 16
-        ; but lets not worry about that right now
+    objectYPos = GAME_OBJECT_RAM_START + objectMax * 3
+    objectYPosFloat = GAME_OBJECT_RAM_START + objectMax * 4
+
+    objectVar1 = GAME_OBJECT_RAM_START + objectMax* 5
+    objectVar2 = GAME_OBJECT_RAM_START + objectMax * 6
+    objectVar3 = GAME_OBJECT_RAM_START + objectMax * 7     
+
+    objectHi = GAME_OBJECT_RAM_START + objectMax * 8
+    objectLo = GAME_OBJECT_RAM_START + objectMax * 9
+
+    objectDrawHi = GAME_OBJECT_RAM_START + objectMax * 10
+    objectDrawLo = GAME_OBJECT_RAM_START + objectMax * 11
+    objectAnimationOffset = GAME_OBJECT_RAM_START + objectMax * 12    ; im thinkin
+    objectAnimationTimer = GAME_OBJECT_RAM_START + objectMax * 13
+
+    objectState = GAME_OBJECT_RAM_START + objectMax * 14
+    objectAtt = GAME_OBJECT_RAM_START + objectMax * 15       ; I'm not sure I need this anymore... I'll keep for now when I learn more about the attributes.
+
+; These are for keeping track of game objects in ram
     firstFreeSlot:      .res 1
     firstOccupiedSlot:  .res 1
     lastOccupiedSlot:   .res 1
-    freeRAMStart = $04      ; linked list of Free RAM slots stored 0400 - 04FF?
 
 
     ; Declaring some static shit for tiles
@@ -1219,6 +1220,47 @@ BathroomBasedEvents:
 DoNothing: 
     rts 
 
+
+; lets assume we have the address to the subroutine we want to jump to on the stack.
+; this is only jumping to subroutines so need to -1 from lo address
+JumpEngine:
+    rts 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Player Logic
+; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; 1/15/25
+    ; so basically I need to redo like all of this?
+    ; I understand why they do the jump feature. cause I think jumping is the best way
+    ; use state as the offset, and then jump to the subroutine 
+            ; how the fuck do i do movement with like acceleration and shit...
+
+
+PlayerLogic:
+
+    ldx playerState
+    lda PlayerGameLoopSubroutinesLo,x 
+    pha 
+    lda PlayerGameLoopSubroutinesHi,x 
+    pha 
+
+    jsr JumpEngine
+
+    
+    ; 
+    rts 
+PlayerGameLoopSubroutinesLo:
+    .byte <DoNothing - 1
+PlayerGameLoopSubroutinesHi:
+    .byte >DoNothing
+
+
 PlayerLogic:
     lda playerState         ; Drinking - Walking - Peeing - Smoking - interacting - X - Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
     asl 
@@ -1749,13 +1791,13 @@ ToiletInteract:
     sta pointerLo
     lda #>(ToiletLetters1)
     sta pointerHi
-    jsr CreateGameObject2
+    jsr CreateGameObject
 
     lda #<(ToiletLetters2)
     sta pointerLo
     lda #>(ToiletLetters2)
     sta pointerHi
-    jsr CreateGameObject2
+    jsr CreateGameObject
     
 
    
@@ -2137,477 +2179,16 @@ SetPlayerPositionMultipleOptions:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;   Game Engine
+;       
+;       CreateGameObject - Assumes PointerLo and Hi have been set to the object data table
+;       DeleteGameObject - Assumes target offset is already in X
+;   
+;       InitializeGameObjectRam - Called on Startup (could maybe be called to clear all game objects)
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-; oh boy pray for me
-; im just yoloing. i made a new branch
-; ok so i have 4 temp vars now. im not sure how to like. make this the best obvi but make it at all
-; i have to set all the positioning and variables and tile and att and script mem address
-; each game object has 8 bytes to it right now. with 4 temp vars. idk if i need 4 more temp vars so i can just temp1-8 or what is best
-; that is what makes sense to me at the moment, because i read somewhere you shouldn't pass variables on the stack so like how else
-; am i supposed to do it unless i write 2 functions that do 4 things each
-; if i run out of memory i will adjust. lets get our hands dirty 
-
-; learn by fucking doing my girl
-
-; ok here is the plan. we are using tables big surprise. so what we are going to do is assume that we have either
-; fuck
-; ok option 1 is assume pointerLo and pointerHi have been set before the call. that makes the most sense to me?
-; option 2 is that hi and lo address is stored in register or temp1 and temp2
-; buts lets roll with option 1 and see why it doesn't work instead of decision paralysis
-
-
-
-; this assumes that pointerLo has already been set
-CreateGameObject:
-    ; hi and low are set. we just need to get the 8 values stored in the table they are pointing to.
-    ; set them using the object_blah_blah_blah and do the linked list shit. so do we need to check for empty list each time?
-    ldy #$00    ; index set to 0
-    ; it might be better to jsut not loop. because i need one of the registers to use as the offset for storing the data into spriteram
-    ; th8is is fucking wrong and dumb and im dumb 
-
-    ; ok another yolo
-    ; we have gameObjLo and Hi. Lo will be pointing to the start of the next free slot of ram.
-    ; Hi will always be $03 cause im just using range of 0300-03FF
-    ; this is bad and basic but i have to do something and it sorta makes sense on how to do it. 
-    ; so while i'm doing this i'll probably figure out the why its not done this way
-
-
-    ; just thought of a major issue
-    ; what if i have 10 game objects. and the 5th needs to be deleted? right now that would not work... fuck thats why you have a linked list. but like....
-    ; hmmmmmmmmm
-
-
-    ; so we assuming the gameObjectLo is already pointing to the correct place
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny 
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny   
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda (pointerLo), y 
-    sta (gameObjectLo), y 
-    iny  
-
-    lda gameObjectLo
-    clc 
-    adc #$08
-    sta gameObjectLo
-
-    rts 
-
-
-
-
-; ok i took way too long of a break
-; i think i need to restart this game engine shit from scratch
-
-; ok creating a gameobj in ram
-; i need to take the data from sometable in rom and put it in ram
-; i need to keep track of where im putting the next game object
-; i need to keep track of what blocks in obj ram are being used to iterate through
-
-
-; this is assuming I have the pointer pointing to where I'm going to place the data
-; and assuming I have the pointer pointing to where the data is im going to store
-
-
-; this function should run at start up. and should set up all the free slots in objectRAM to point at the next slot so
-; when i need to put an object in RAM i just take the first free slot in this linked list and have next free slot point to the first slot's NEXT
-
-; so each object in this linked list has 2 things
-    ; the index of where the object starts in ram 00 - FF?
-    ; the index of next
-
-; picking random place to put this shit? 0400 work?
-; I have a FreeRamFirst pointer?
-; and I have freeRAMStart defined as 04
-InitializeGameObjectRam:
-
-    ; spriteRamStart = $0300
-    ; objectMax = $20  
-    ; objectNext
-    ; firstFreeSlot:      .res 1
-    ; firstOccupiedSlot:  .res 1
-    ; lastOccupiedSlot:   .res 1
-
-; ok so we are going back to the old method i first read about using the offset stuff whatever god im so fucking hungry i can't think
-; 
-; 
-    
-    ldy #$00
-    sty gameObjectCounter
-    lda #$01
-    sty firstFreeSlot   ; setting firstFreeSlot as 0 because that is the first free slot at startup. 
-    ; then lets do the loop and fill each objectNext value to point at the next object
-    ; if an obj points to objectMax then it points to null
-
-    ; objectMax is the same thing as Null for this linkedList!!!!
-    ; do a loop setting each objectNext to equal 1 more than that object's num until we reach the end which is max_objects or whatever which is like 20 right now. so pointing to null is pointing to maxObjects + 1 since there are no negative numbers.
-
-@StartInitGameObjRamLoop:
-    ; we are going to store a at objectNext,y
-    ; so objectNext,0 is at $0300. It's "obj ID" is 0 or the offset. and will set its next as +1
-    sta objectNext,y 
-    clc                 ; incrementing a and y. so next loop we store 2 at objNext,1 all the way to storing 20 at objNext,19 but not really 19 whatever 19 is in hex
-    adc #$01
-    iny 
-    cmp #objectMax       ; if a is the same as objMax then we have reached the end? or do we need to do one more time to put 20 at slot 19? i think we need one more time
-    bcc @StartInitGameObjRamLoop
-
-    sta objectNext,y    ; this is storing the value ObjectMax in the last object's next value which is the same as it pointing to null and represents the end of available memory
-
-    ; I also need to set firstOccupiedSlot and lastOccupiedSlot as objectMax (null) and that really should be it for init the game obj memory.
-    ; if this logic works then we gucci please logic be right
-
-    sta firstOccupiedSlot
-    sta lastOccupiedSlot
-    rts 
-
-
-
-; This logic should work for adding. I am now working on deleting which may cause some bugs here when the list gets populated, then deleted and then repopulated and then deleted.
-; im mostly concered with the list getting back to empty and making sure there are no breaks in the linkedlist 
-
-
-; this is purely for getting the memory management down. I'm not caring about any variables or pointers or whatever. we are just going to call this along side deletegameobject
-; to make sure that shit is added and deleted and then properly iterated through. 
-
-; also not sure about trying to add to a full list or adding last possible element
-
-
-
-;; ok now its time to think about adding the actual game object data to the other variables. the main thing is I need to know what my offset is which is what the whole linked
-        ; list bullshit is about. but after i figure out where I'm putting it and make sure all the pointers are pointing, I can use that slot as offset to just blast through
-        ; the table that some pointer is pointing at and move it to ram.
- CreateGameObject2:
-    lda firstFreeSlot
-    cmp #objectMax
-    beq @DoneAddingNewElement   ; if firstFreeSlot is pointing to objectMax then the list is full and we can't add more objects to it.
-    ; i feel like to make a general function. we need to check if the first and the last both equal 0? or each other?
-    ; wait thats dumb firstOccupiedSlot would be null thats all we have to check
-
-    ; checking if firstOccupiedSlot is equal to ObjectMax to see if RAM is empty
-
-    ; might also need to check if first and last are equal to see if list is empty or full?
-
-    ;; i could also add the data here. before i do anything with pointers. not sure which is better but i can optimize later. lets do it here so i don't have to think
-    ; lets just do it here
-    ; we doing dumb shit. the order before actually setting all the variables
-    ; y pos | tile | att | x pos | game routine hi | game routine lo | draw function hi | draw function lo | var 1 | var 2 | animation offset | animation timer | object state
-    ldx firstFreeSlot           ; this is the offset for putting the data
-    ldy #$00                    ; this is the offset of the data table we grabbing the data from
-    lda (pointerLo),y   ; y pos
-    sta objectYPos,x 
-    iny 
-    lda (pointerLo),y   ; tile
-    sta objectVar3,x 
-    iny 
-    lda (pointerLo),y   ; att
-    sta objectAtt,x 
-    iny 
-    lda (pointerLo),y   ; x pos
-    sta objectXPos,x
-    iny  
-    lda (pointerLo),y   ; HI byte of gameLoop function
-    sta objectHi,x 
-    iny 
-    lda (pointerLo),y   ; Lo
-    sta objectLo,x 
-    iny 
-    lda (pointerLo),y   ; draw function hi
-    sta objectDrawHi,x 
-    iny 
-    lda (pointerLo),y   ; drawfunction lo
-    sta objectDrawLo,x 
-    iny 
-    lda (pointerLo),y   ; the one variable my objects have right now
-    sta objectVar1,x 
-    iny 
-    lda (pointerLo),y 
-    sta objectVar2,x    ; var 2
-    iny 
-    lda (pointerLo),y 
-    sta objectAnimationOffset,x    ; animation offset
-    iny 
-    lda (pointerLo),y 
-    sta objectAnimationTimer,x    ; animation timer
-    iny 
-    lda (pointerLo),y 
-    sta objectState,x    ; state
-    iny 
-
-
-    ; I am also going to have an array of current offsets to help the draw function randomize the sprite prio order each frame
-    ; gameObjCounter is my offset of offsets
-    ; it should be pointing at the next open slot
-    ; i should not be at this code if i have max game objects so no error checking baby
-    
-    txa 
-    ldx gameObjectCounter
-    sta GAME_OBJECT_OFFSET,x 
-    tax 
-    inc gameObjectCounter
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;objectNext = spriteRamStart + objectMax * 0 ; ok we are going to try this implementation i guess
-    ;objectXPos = spriteRamStart + objectMax * 1
-    ;objectYPos = spriteRamStart + objectMax * 2
-    ;objectTile = spriteRamStart + objectMax * 3
-    ;objectAtt = spriteRamStart + objectMax * 4
-    ;objectVar1 = spriteRamStart + objectMax* 5
-    ;objectHi = spriteRamStart + objectMax * 6
-    ;objectLo = spriteRamStart + objectMax * 7
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ; we need 
-        ; objectVar1
-        ; objectHi
-        ; objectLo
-        ; objectVar2
-
-    ; I don't need to decide on an order yet. lets make sure I can create and delete and iterate game objects with this bullshit first
-        ; But i will need to decide on an ordering
-        ; fuck do I need to start doing documentation?
-            ; is that me? I feel like i always start it and then don't update it and then its too much to update and it will just change so I might as well just wait till im done to do it 
-                ; yeah that is more me
-            ; ok random comment buried in the code it is    
-
-    ; I THINK THIS IS RIGHT? just taking fromt table and placing into var.
-
-
-
-    lda firstOccupiedSlot
-    cmp #objectMax
-    beq @TheCurrentListIsEmpty           ; not sure if i should branch if equal or if not equal yet. lets see what things have to happen and what order would make more sense
-
-
-
-    ldx lastOccupiedSlot                 ; this is setting up offsets for adding nth element
-    lda firstFreeSlot
-    sta objectNext,x                        ; this is storing the newely added element's slot as the next value of the previous end of the list's next value
-    jmp @TimeToAddNewElement
-
-@TheCurrentListIsEmpty:
-    lda firstFreeSlot
-    sta firstOccupiedSlot 
-    ; this is assuming we will use y as the offset to add all the data to the the other variable tables  
-    ; this should work for both adding 1st and adding nth element. only difference is how to load x and y registers since lastOccupiedSlot is null when empty
-
-@TimeToAddNewElement:
-    ; before we use y register. we should add all the data from the pointer to the variables. cause we haven't needed to move any pointers around
-        ; x is lastOccupiedSlot but we can re ldx to get that value back. and we are placing in firstFreeSlot. so we can do all the adding using y or x to offset the
-            ; pointer for the data. then reset x and y for doing the pointer moving to keep the lists working
-    
-
-    ldy firstFreeSlot  
-    lda objectNext,y        ; this is storing the current FirstFreeSlot's next value as the new firstFreeSlot
-    sta firstFreeSlot
-
-    lda #objectMax
-    sta objectNext,y        ; this is storing null in the slot we are adding the new element to. because we always add to the end so it should point to null
-      
-    sty lastOccupiedSlot    ; this is setting the lastOccupiedSlot as firstFreeSlot cause thats where we put the newely added element
-
-@DoneAddingNewElement:    
-    rts 
-
-
-; so for deleting it should be maybe easy? what we need is the object number we are deleting. which is just its slot number so it should be easy. i think the tricky part is connecting
-; the list back together. cause 1 -> 2 -> 3. if we are deleting 2 we need 1 to point to 3. which means we might have to walk down the list until we reach 1 before 2. so O(n) instead of 0(1) of inserting
-
-
-
-; THIS ASSUMES X REG already has the slot we are deleting
-DeleteGameObject:
-
-    ; before we do any deleting of the obj data
-    ; ima delete the offset from the GAME_OBJ_OFFSET array
-    ; which is finding the element in the un-ordereed list
-    ; and then shifting all the elements behind it
-    ; fucking hacker rank bullshit
-    ; so what are the cases
-        ; first element
-            ; first and only
-            ; other elements in list
-        ; middle element
-        ; last element
-            ; first and last
-            ; just regular last
-    ; i know there is some simple ass logic that covers multiple cases
-    
-    txa         ; target is now A reg
-    pha 
-    ldy #$00        ; y is our offset to access the data
-
-@StartDeletingOffsetLoop:
-    cmp GAME_OBJECT_OFFSET,y 
-    beq @TargetOffsetFound
-    iny 
-    jmp @StartDeletingOffsetLoop    ; no error checking. we will only delete game objects that exist. so thats what it is
-
-@TargetOffsetFound:
-    dec gameObjectCounter
-    tya     ; y is holding n
-    tax     ; x is holding n + 1
-    inx 
-
-@ShufflingOffsetsForwardLoop:
-    cpy gameObjectCounter                      ; if y is the same as the new decremented gameObjectCounter, we are at the end of the list and don't need to shuffle elements forward
-    beq @DoneDeletingGameObjectOffset
-    lda GAME_OBJECT_OFFSET,x 
-    sta GAME_OBJECT_OFFSET,y 
-    iny 
-    inx 
-    jmp @ShufflingOffsetsForwardLoop  
-
-@DoneDeletingGameObjectOffset:
-    pla 
-    tax 
-    
-    ; WE ARE ASSUMING X is the game object we are deleting?
-    ; so what are the scenarios?
-
-    ; deleting first element (n) (order probably wrong)
-    ; also didn't consider if deleting object is before or after the current FOS
-        ; FOS -> FOS.next
-        ; if n < FFS: FFS -> FOS
-        ; FOS.next -> FFS
-
-    ; n = FirstOccupiedSlot
-
-    ; x reg is going to hold the slot we are deleting
-        ;ldx firstOccupiedSlot       ; this could also be n instead which it probably should be
-    cpx firstOccupiedSlot
-    bne @DeletingMiddleOrLast
-    ;; THIS IS FOR DELETING FIRST OBJECT IN LIST
-@DeletingFirstElementInList:                                                                                                     
-    ldy firstFreeSlot
-
-    lda objectNext,x        ; FOS -> FOS.next
-    sta firstOccupiedSlot
-    cpx firstFreeSlot
-    bcs @TargetGreaterThanFSS
-    
-    stx firstFreeSlot       ; if n < FFS: FFS -> FOS   
-    tya 
-    sta objectNext,x        ; FOS.next -> FFS
-    jmp @DoneDeleting
-
-@TargetGreaterThanFSS:
-    lda objectNext,y        ; FOS.next -> FFS.next
-    sta objectNext,x 
-
-    txa 
-    sta objectNext,y         ; FFS.next -> FOS
-    jmp @DoneDeleting
-
-@DeletingMiddleOrLast:
-    ; ok so we need to iterate through the list and set n.previous.next to n.next
-    ; we also need to add this slot into the free slot list
-    ; so we need to set up prev which we will use temp? could also possibly use a reg but i think thats worse
-    ; we also can assume we are not deleting the first element. so we can start looking at FOS.next and use FOS as prev
-    
-    stx temp1               ; temp1 is target
-    ldx firstOccupiedSlot   ; setting x to be prev
-
-
-    ; i think i can move this down into the loop and remove the bottom ldy since its the same thing but i'll do that after it works
-    ldy objectNext,x        ; setting y to be current ( we start 1 element in since we KNOW we aren't deleting the first element )                       ; 
-@WalkingThroughElementListStart:
-    ; first we must compare current to target    
-    tya 
-    cmp temp1
-    beq @TargetFound
-
-    ; target is not found lets iterate to next
-    tax 
-    ldy objectNext,x
-    jmp @WalkingThroughElementListStart 
-@TargetFound:
-    ; i need to move prev.next to current.next
-    lda objectNext,y   ; getting curr.next
-    sta objectNext,x    ; storing curr.next in prev.next
-
-    cmp #objectMax
-    beq @UpdateLastOccupiedSlot
-    jmp @UpdateFreeSlotList
-
-@UpdateLastOccupiedSlot:
-    stx lastOccupiedSlot
-    ; i also need to add the deleted slot into the freeSlot list and update firstFreeSlot if applicable
-
-@UpdateFreeSlotList:
-    ; so honestly i shouldn't keep track of keeping FFS lower for literally no reason
-    ; so really all I have to do when I delete something, is just add it to the front of FFS
-
-    ; so i make the target point to FFS
-    ; and then set FSS as the target
-    lda firstFreeSlot
-    sta objectNext,y    ; setting the target.next to point to the old FFS     
-    sty firstFreeSlot
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; SAVING THIS INCASE I FUCK IT UP TRYING THE OTHER IMPLEMENTATION
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-    
-    ; target < FFS
-    ; first we need to say target.next points to FFS
-        ; y is current and is the target since we have found target
-        ; and a might be target but lets just do each piece isolated and then work out the order and handling of registers
-   ; lda firstFreeSlot
-    ;cmp temp1           ; we need to branch depending on if target is before or after the current FFS
-   ; bcc @FSSLessThanTarget
-   ; sta objectNext,y
-   ; sty firstFreeSlot     ; then we can move FFS to target and that should be it
-   ; jmp @DoneDeleting
-
-;@FSSLessThanTarget:
-    ; target > FFS
-
-    ; could maybe just do tax since we lda firstFreeSlot and wouldn't have changed it by this point
-  ;  ldx firstFreeSlot   ; need to use FFS as an offset to get it's next so we have to use y or x. and since y is also target its already stored in temp1 if we need it
-                        ; wait maybe its better to use x. since we might not need to care about prev if we already set up those pointers. 
-  ;  lda objectNext,x    ; a now has FFS.next
-   ; sta objectNext,y    ; storing old FFS.next as target.next
-   ; tya 
-   ; sta objectNext,x    ; storing target as new FFS.next
-    ; I also need to update lastOccupiedSlot if applicable
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-@DoneDeleting:
-    rts 
-
-
-; so. i need to take into account where to start. cause things like timers and shit. unless i load those into ram but idk if i need to. i think they are their own thing?
-
-
-
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; the big boy
 ; what do i need to do:
@@ -2683,6 +2264,334 @@ GameObjectIteration:
         ; when that rts it should go back to GameEngine subroutine
     rts 
 
+
+
+
+
+; I need to start dating these
+    ; oh boy pray for me
+    ; im just yoloing. i made a new branch
+    ; ok so i have 4 temp vars now. im not sure how to like. make this the best obvi but make it at all
+    ; i have to set all the positioning and variables and tile and att and script mem address
+    ; each game object has 8 bytes to it right now. with 4 temp vars. idk if i need 4 more temp vars so i can just temp1-8 or what is best
+    ; that is what makes sense to me at the moment, because i read somewhere you shouldn't pass variables on the stack so like how else
+    ; am i supposed to do it unless i write 2 functions that do 4 things each
+    ; if i run out of memory i will adjust. lets get our hands dirty 
+
+    ; learn by fucking doing my girl
+
+    ; ok here is the plan. we are using tables big surprise. so what we are going to do is assume that we have either
+    ; fuck
+    ; ok option 1 is assume pointerLo and pointerHi have been set before the call. that makes the most sense to me?
+    ; option 2 is that hi and lo address is stored in register or temp1 and temp2
+    ; buts lets roll with option 1 and see why it doesn't work instead of decision paralysis
+
+
+
+
+
+
+
+
+
+; ok i took way too long of a break
+; i think i need to restart this game engine shit from scratch
+
+; ok creating a gameobj in ram
+; i need to take the data from sometable in rom and put it in ram
+; i need to keep track of where im putting the next game object
+; i need to keep track of what blocks in obj ram are being used to iterate through
+
+
+; this is assuming I have the pointer pointing to where I'm going to place the data
+; and assuming I have the pointer pointing to where the data is im going to store
+
+
+; this function should run at start up. and should set up all the free slots in objectRAM to point at the next slot so
+; when i need to put an object in RAM i just take the first free slot in this linked list and have next free slot point to the first slot's NEXT
+
+; so each object in this linked list has 2 things
+    ; the index of where the object starts in ram 00 - FF?
+    ; the index of next
+
+; picking random place to put this shit? 0400 work?
+; I have a FreeRamFirst pointer?
+; and I have freeRAMStart defined as 04
+InitializeGameObjectRam:
+
+    ; GAME_OBJECT_RAM_START = $0300
+    ; objectMax = $20  
+    ; objectNext
+    ; firstFreeSlot:      .res 1
+    ; firstOccupiedSlot:  .res 1
+    ; lastOccupiedSlot:   .res 1
+
+; ok so we are going back to the old method i first read about using the offset stuff whatever god im so fucking hungry i can't think
+; 
+; 
+    
+    ldy #$00
+    sty gameObjectCounter
+    lda #$01
+    sty firstFreeSlot   ; setting firstFreeSlot as 0 because that is the first free slot at startup. 
+    ; then lets do the loop and fill each objectNext value to point at the next object
+    ; if an obj points to objectMax then it points to null
+
+    ; objectMax is the same thing as Null for this linkedList!!!!
+    ; do a loop setting each objectNext to equal 1 more than that object's num until we reach the end which is max_objects or whatever which is like 20 right now. so pointing to null is pointing to maxObjects + 1 since there are no negative numbers.
+
+@StartInitGameObjRamLoop:
+    ; we are going to store a at objectNext,y
+    ; so objectNext,0 is at $0300. It's "obj ID" is 0 or the offset. and will set its next as +1
+    sta objectNext,y 
+    clc                 ; incrementing a and y. so next loop we store 2 at objNext,1 all the way to storing 20 at objNext,19 but not really 19 whatever 19 is in hex
+    adc #$01
+    iny 
+    cmp #objectMax       ; if a is the same as objMax then we have reached the end? or do we need to do one more time to put 20 at slot 19? i think we need one more time
+    bcc @StartInitGameObjRamLoop
+
+    sta objectNext,y    ; this is storing the value ObjectMax in the last object's next value which is the same as it pointing to null and represents the end of available memory
+
+    ; I also need to set firstOccupiedSlot and lastOccupiedSlot as objectMax (null) and that really should be it for init the game obj memory.
+    ; if this logic works then we gucci please logic be right
+
+    sta firstOccupiedSlot
+    sta lastOccupiedSlot
+    rts 
+
+
+;comments
+    ; This logic should work for adding. I am now working on deleting which may cause some bugs here when the list gets populated, then deleted and then repopulated and then deleted.
+    ; im mostly concered with the list getting back to empty and making sure there are no breaks in the linkedlist 
+    ; this is purely for getting the memory management down. I'm not caring about any variables or pointers or whatever. we are just going to call this along side deletegameobject
+    ; to make sure that shit is added and deleted and then properly iterated through. 
+    ; also not sure about trying to add to a full list or adding last possible element
+
+
+;; ok now its time to think about adding the actual game object data to the other variables. the main thing is I need to know what my offset is which is what the whole linked
+        ; list bullshit is about. but after i figure out where I'm putting it and make sure all the pointers are pointing, I can use that slot as offset to just blast through
+        ; the table that some pointer is pointing at and move it to ram.
+CreateGameObject:
+
+    ; checking if list is full
+    lda firstFreeSlot
+    cmp #objectMax
+    beq @DoneAddingNewElement   ; if firstFreeSlot is pointing to objectMax then the list is full and we can't add more objects to it.
+
+    ; put the object data from rom into ram
+
+;   XPos, XPosFloat, YPos, YPosFloat, Var1, Var2, Var3, ObjectHi, ObjectLo, DrawHi, DrawLo, Ani Offset, Ani Timer, State, Att
+
+    ldx firstFreeSlot           ; this is the offset for putting the data
+    ldy #$00                    ; this is the offset of the data table we grabbing the data from
+
+    lda (pointerLo),y   
+    sta objectXPos,x 
+    iny 
+    lda (pointerLo),y  
+    sta objectXPosFloat,x 
+    iny 
+    lda (pointerLo),y  
+    sta objectYPos,x
+    iny  
+    lda (pointerLo),y   
+    sta objectYPosFloat,x 
+    iny 
+    lda (pointerLo),y  
+    sta objectVar1,x 
+    iny 
+    lda (pointerLo),y   
+    sta objectVar2,x 
+    iny 
+    lda (pointerLo),y  
+    sta objectVar3,x 
+    iny 
+    lda (pointerLo),y  
+    sta objectHi,x 
+    iny 
+    lda (pointerLo),y 
+    sta objectLo,x    
+    iny 
+    lda (pointerLo),y
+    sta objectDrawHi,x
+    iny 
+    lda (pointerLo),y 
+    sta objectDrawLo,x 
+    iny  
+    lda (pointerLo),y 
+    sta objectAnimationOffset,x    
+    iny 
+    lda (pointerLo),y 
+    sta objectAnimationTimer,x   
+    iny 
+    lda (pointerLo),y 
+    sta objectState,x    
+    iny 
+    lda (pointerLo),y 
+    sta objectAtt,x 
+    iny 
+
+
+    ; I am also going to have an array of current offsets to help the draw function randomize the sprite prio order each frame
+    ; gameObjCounter is my offset of offsets
+    ; it should be pointing at the next open slot
+    ; i should not be at this code if i have max game objects so no error checking baby
+    
+    txa 
+    ldx gameObjectCounter
+    sta GAME_OBJECT_OFFSET,x 
+    tax 
+    inc gameObjectCounter
+
+; This is adding the game object into the linked list
+
+    ; checking if list is empty
+    lda firstOccupiedSlot           
+    cmp #objectMax
+    beq @TheCurrentListIsEmpty           ; not sure if i should branch if equal or if not equal yet. lets see what things have to happen and what order would make more sens
+
+    ldx lastOccupiedSlot                 ; this is setting up offsets for adding nth element
+    lda firstFreeSlot
+    sta objectNext,x                        ; this is storing the newely added element's slot's next value to the previous end of the list's next value
+    jmp @TimeToAddNewElement
+
+@TheCurrentListIsEmpty:
+    lda firstFreeSlot
+    sta firstOccupiedSlot 
+    ; this is assuming we will use y as the offset to add all the data to the the other variable tables  
+    ; this should work for both adding 1st and adding nth element. only difference is how to load x and y registers since lastOccupiedSlot is null when empty
+
+@TimeToAddNewElement:
+    ; before we use y register. we should add all the data from the pointer to the variables. cause we haven't needed to move any pointers around
+        ; x is lastOccupiedSlot but we can re ldx to get that value back. and we are placing in firstFreeSlot. so we can do all the adding using y or x to offset the
+            ; pointer for the data. then reset x and y for doing the pointer moving to keep the lists working
+    
+
+    ldy firstFreeSlot  
+    lda objectNext,y        ; this is storing the current FirstFreeSlot's next value as the new firstFreeSlot
+    sta firstFreeSlot
+
+    lda #objectMax
+    sta objectNext,y        ; this is storing null in the slot we are adding the new element to. because we always add to the end so it should point to null
+      
+    sty lastOccupiedSlot    ; this is setting the lastOccupiedSlot as firstFreeSlot cause thats where we put the newely added element
+
+@DoneAddingNewElement:    
+    rts 
+
+
+; so for deleting it should be maybe easy? what we need is the object number we are deleting. which is just its slot number so it should be easy. i think the tricky part is connecting
+; the list back together. cause 1 -> 2 -> 3. if we are deleting 2 we need 1 to point to 3. which means we might have to walk down the list until we reach 1 before 2. so O(n) instead of 0(1) of inserting
+
+; THIS ASSUMES X REG already has the slot we are deleting
+DeleteGameObject:
+    
+    ; First we delete the offset from the GameObject Offset Array
+    txa         ; target is now A reg
+    pha         ; storing target on stack i don't remember why
+    ldy #$00        ; y is our offset to access the data
+
+@StartDeletingOffsetLoop:
+    cmp GAME_OBJECT_OFFSET,y 
+    beq @TargetOffsetFound
+    iny 
+    jmp @StartDeletingOffsetLoop    ; no error checking. we will only delete game objects that exist. so thats what it is
+
+@TargetOffsetFound:
+    dec gameObjectCounter
+    tya     ; y is holding n
+    tax     ; x is holding n + 1
+    inx 
+
+@ShufflingOffsetsForwardLoop:
+    cpy gameObjectCounter                      ; if y is the same as the new decremented gameObjectCounter, we are at the end of the list and don't need to shuffle elements forward
+    beq @DoneDeletingGameObjectOffset
+    lda GAME_OBJECT_OFFSET,x 
+    sta GAME_OBJECT_OFFSET,y 
+    iny 
+    inx 
+    jmp @ShufflingOffsetsForwardLoop  
+
+@DoneDeletingGameObjectOffset:
+    pla 
+    tax 
+
+    ; Now we delete it from the linked list
+    cpx firstOccupiedSlot
+    bne @DeletingMiddleOrLast
+    ;; THIS IS FOR DELETING FIRST OBJECT IN LIST
+@DeletingFirstElementInList:                                                                                                     
+    ldy firstFreeSlot
+
+    lda objectNext,x        ; FOS -> FOS.next
+    sta firstOccupiedSlot
+    cpx firstFreeSlot
+    bcs @TargetGreaterThanFSS
+    
+    stx firstFreeSlot       ; if n < FFS: FFS -> FOS   
+    tya 
+    sta objectNext,x        ; FOS.next -> FFS
+    jmp @DoneDeleting
+
+@TargetGreaterThanFSS:
+    lda objectNext,y        ; FOS.next -> FFS.next
+    sta objectNext,x 
+
+    txa 
+    sta objectNext,y         ; FFS.next -> FOS
+    jmp @DoneDeleting
+
+@DeletingMiddleOrLast:
+    ; ok so we need to iterate through the list and set n.previous.next to n.next
+    ; we also need to add this slot into the free slot list
+    ; so we need to set up prev which we will use temp? could also possibly use a reg but i think thats worse
+    ; we also can assume we are not deleting the first element. so we can start looking at FOS.next and use FOS as prev
+    
+    stx temp1               ; temp1 is target
+    ldx firstOccupiedSlot   ; setting x to be prev
+
+
+    ; i think i can move this down into the loop and remove the bottom ldy since its the same thing but i'll do that after it works
+    ldy objectNext,x        ; setting y to be current ( we start 1 element in since we KNOW we aren't deleting the first element )                       ; 
+@WalkingThroughElementListStart:
+    ; first we must compare current to target    
+    tya 
+    cmp temp1
+    beq @TargetFound
+
+    ; target is not found lets iterate to next
+    tax 
+    ldy objectNext,x
+    jmp @WalkingThroughElementListStart 
+@TargetFound:
+    ; i need to move prev.next to current.next
+    lda objectNext,y   ; getting curr.next
+    sta objectNext,x    ; storing curr.next in prev.next
+
+    cmp #objectMax
+    beq @UpdateLastOccupiedSlot
+    jmp @UpdateFreeSlotList
+
+@UpdateLastOccupiedSlot:
+    stx lastOccupiedSlot
+    ; i also need to add the deleted slot into the freeSlot list and update firstFreeSlot if applicable
+
+@UpdateFreeSlotList:
+    ; so honestly i shouldn't keep track of keeping FFS lower for literally no reason
+    ; so really all I have to do when I delete something, is just add it to the front of FFS
+
+    ; so i make the target point to FFS
+    ; and then set FSS as the target
+    lda firstFreeSlot
+    sta objectNext,y    ; setting the target.next to point to the old FFS     
+    sty firstFreeSlot
+
+
+@DoneDeleting:
+    rts 
+
+
+
 ; ok do i make this for gameloop or do i try and make it generic. would making it generic benefit any of the functions that use the stack to jump to a function from an address table
     ; right now. i want it to work
     ; i don't think generic is that hard. i also annoyingly have seen the code for this so i feel kind of icky but whatever. i did organically come up with the idea even if i knew of the concept before hand
@@ -2717,317 +2626,6 @@ JumpEngine:
     jmp (jumpHi)
     rts 
 
-
-
-DrawEngine:
-    lda spriteBufferOffset
-    sta spriteBufferOffsetStart
-    lda firstOccupiedSlot
-    cmp #objectMax                  ; ok we need to check here if firstOccupiedSlot points to object max. if so then there are no objects so I need to do some extra stuff to make sure I don't mess up the offset
-    beq @NoGameObjectsToDraw
-    jmp @AtLeastOneGameObject
-@DrawEngineLoopStart:
-    cmp #objectMax
-    beq @DoneDrawingObjects
-@AtLeastOneGameObject:
-    tax 
-    lda objectNext,x     
-    sta stupidTemp          ; right now im storing the next index in stupid temp. i wonder if there is some sort of sequence where i don't need to but we shall see
-                                    ; so if i wanted to have all the logic here for every type of object. I would need some variable to determine which type it is, to then go to the correct table of draw data
-                                            ; that might be better. but for now. im going to have each object have its own draw function that is called but it will return the address of where the data is
-                                            ; again i honestly don't know which is better so lets just do this one cause its my idea and see
-
-    jsr DrawEngineJmp       ; this should set pointerLo and Hi to point to the table of spritemeta data
-    lda objectXPos,x        ; we store the x and y anchors to use for the relative sprite positions
-    sta temp1
-    lda objectYPos,x
-    sta temp2
-    ldy #$00                ; we can use y to get the data with indirect addressing
-    ; ldx #$00                ; and x can be used to store the data since we have spriteBufferLo and Hi set
-    ; now pointer hi and low should be set to the table of tiles and offsets
-    ldx spriteBufferOffset          ; we need to 
-@StoringOneSpriteFromObject:
-    
-    lda (pointerLo),y               ; this should be the y offset. the offest will never be FF so I'm using it as a terminator for sprites
-    cmp #$FF
-    beq @DoneDrawingThisObject
-    clc 
-    adc temp2
-    sta SPRITE_BUFFER_START,x
-    iny   
-
-    lda (pointerLo),y           ; this is the tile. should just take and place no problem
-    sta SPRITE_BUFFER_START + 1,x  
-    iny 
-
-    lda (pointerLo),y           ; this is the attribute. same thing take and place
-    sta SPRITE_BUFFER_START + 2,x
-    iny 
-
-    lda (pointerLo),y           ; this is the x offset. add it to fuck. negative numbers. I'll have to use the first byte to determine if its negative or not unless the position is always the top left but idk if that works
-    clc 
-    adc temp1 
-    sta SPRITE_BUFFER_START + 3,x
-    iny 
-    inx 
-    inx 
-    inx 
-    inx 
-    cpx #$00
-    bne @HaveNotLooped2
-    ldx #$40                ; starting address for object sprite dtata. but im assuming this will have to change
-@HaveNotLooped2:
-    ;stx spriteBufferOffset
-    jmp @StoringOneSpriteFromObject
-
-@DoneDrawingThisObject:
-    stx spriteBufferOffset
-    lda stupidTemp
-    jmp @DrawEngineLoopStart
-
-
-
-@NoGameObjectsToDraw:
-    ldx spriteBufferOffset
-    jmp @StartClearingGarbage
-
-
-@DoneDrawingObjects:
-    ldx spriteBufferOffset
-    cpx spriteBufferOffsetStart
-    beq @DoneClearingGarbage
-   ; txa 
-  ;  clc 
-  ;  adc spriteBufferOffset
-  ;  tax 
-    ;   now we have to fill the rest with FE to clear garbage data
-@StartClearingGarbage:
-    lda #$FE
-@ClearingGarbageLoopStart:
-    sta SPRITE_BUFFER_START,x 
-    inx 
-    sta SPRITE_BUFFER_START,x 
-    inx 
-    sta SPRITE_BUFFER_START,x 
-    inx 
-    sta SPRITE_BUFFER_START,x 
-    inx 
-    cpx #$00
-    bne @HaveNotLooped3 
-    ldx #$40
-@HaveNotLooped3:
-    cpx spriteBufferOffsetStart
-    beq @DoneClearingGarbage
-    jmp @ClearingGarbageLoopStart
-
-@DoneClearingGarbage:
-    txa 
-    clc 
-    adc #$08
-    cmp #$40
-    bcs @HaveNotLooped4
-    lda #$40
-@HaveNotLooped4:
-    sta spriteBufferOffset
-    rts 
-
-; this we have to assume we have pointerLo set up
-; we are also assuming anchorX and anchorY have been set up.
-; this also doesn't care about sprite 0. somehow? how do i fix this issue
-; so all we have to do is grab the data and place it at SPRITE_BUFFER_START,spriteBufferOffset
-; we need to store the new offset
-; i made variables currentX and currentY. i feel like im dancing around the really effiencnt cool way to do this but i haven't landed on it quite yet
-DrawMetaSprite:
-    ldx spriteBufferOffset
-    ldy #$00
-
-    ; god why is this so fucking hard
-    ; I also need to think about flipping sprites. 
-        ; right now i probably only need to flip horizontally
-    lda (pointerLo),y   ; y postition
-            
-    clc 
-    adc currentY 
-    sta SPRITE_BUFFER_START,x 
-    iny 
-    inx 
-
-    lda (pointerLo),y   ; tile 
-    sta SPRITE_BUFFER_START,x 
-    iny 
-    inx 
-
-    lda (pointerLo),y   ; att
-    sta SPRITE_BUFFER_START,x 
-    iny 
-    inx 
-
-    lda (pointerLo),y   ; x postition
-    clc 
-    adc currentX 
-    sta SPRITE_BUFFER_START,x 
-    iny 
-    inx
-
-    lda (pointerLo),y ; will be FF to say its done 
-
-    rts 
-
-DrawEngineJmp:
-    lda objectDrawHi,x 
-    pha 
-    lda objectDrawLo,x 
-    pha 
-    rts 
-;; ONLY 8 SPRITES CAN SHARE A SCANLINE
-DrawTextStatic:
-; y is holding the current gameobject ID
-    ; this why i can't take these breaks. time to relearn fucking x and y reg with indirect addressing for the 100th time
-        ; its ok everytime i learn it i learn it more.... maybe
-        ; if it needs to be x i can move it or do something i will figure it out. stop letting everything you don't know stop you
-        ; you know nothing so who cares
-
-    ; first this is static. so what do i need. I need to know anchor pos, which objectxpos,y and objectypos,y should fetch.
-
-
-    
-    ; i need to get the address of the table of characters from TextTableLo and TextTableHi using var2 or some bits in var1 as the index to get the right text table address
-
-    ; buffer needs to first have count (which is characters in string * 4) but this would not include white space or newlines unless i do like some text box thingy which is not in this scope rn
-    ; I then need to loop through the characters,
-    ; putting into a buffer:
-        ; y pos that is objectypos + ( 8 * newline chars read )
-        ; tile that is take from the texttable
-        ; att this is either taken from text table or set as something default
-        ; x pos that is objectxpos + ( 8 * char count ( reset every newline char ))
-
-
-    ; so then how do i fill a buffer?
-        ; this is the hard part that hopefully will open up a lot more things to be possible.
-    ; im guessing i would have like. a variable that has the start of the buffer. so that is set.
-    ; and then a variable that is where the next value goes as an offset.
-    ; so like load buffer into pointer2Lo and pointer2Hi. and put data in (pointer2Lo),x where x isd that variable. put the 4 pieces of info in and then repeat for the next char
-    ; so then after we read the buffer we reset it by putting the pointer of the end at the start. no need to clear the data... well we would need to put 00 at the end then so it doesn't read some and then see garbage and think its the next count
-        ; but zeroing out the buffer sounds not the move. so just setting where its pointing to 00 after each draw func is called s ounds smart. that takes like no time.
-
-    ; i should have the pointer variable for the buffer already loaded at the start of the function that calls all the draw functions.
-    ; so it should be as simple as im currently doing with writing to sprite ram. just into the buffer instead. and then from that buffer go to sprite ram.
-
-
-; so like
-    ; i have current game obj ID
-    ; i use that to call this function from gameobjectDrawHi and Lo or whatever i named it 
-    ; i have some variable that is the offset to which text it is. which would be set when the text is created.
-    ; I then do what....
-    ; this would make sense to fill a buffer with y tile att x for each letter. then the function that calls this goes through that buffer and puts it into spriteram
-        ; for text that never moves i could hard code the locations maybe
-    
-
-    ; ok ima just make this one static. and then make one for text tat moves cause i need to start somewhere.
-    ; so basically i need to fill a buffer with the this info. and then in the function that calls this one, read that buffer into the correct spot in mem
-    ;   cause idk where this will be written here. this is just to get the info and order it so its all ready to be easily copied over.
-
-    ; so we are going to use the x and y pos as the anchor. and then build from there. we can use $00 and $01 to indicate a space and a newline?
-        ; since we will have a count so we wont accidently read a $00 as end of buffer.
-            ; so the buffer in my head will look like <count>, data, data, data, count, data, count, data, data, data, data, $00 (end of buffer)
-                                                    ;   3, data, data, data, 1, data, 4, data, data, data, data, 00 ( the count is 0 i guess which also means end of buffer)
-    
-    
-    
-    
-    ; lets actually do some shit my girl
-
-    ; lets get the anchor coords and store in what temp1 and temp2?
-        ; wait the anchor is just xpos ypos. will need to edit when i add float
-
-
-    ; ok so i should have the variables be like the offset for the text table. lets say var 2 for now. might have to make it part of var1 depending
-    lda objectXPos,x
-    sta temp1
-    lda objectYPos,x
-    sta temp2
-
-    ldy objectVar2,x
-    lda TextTableHi,y 
-    sta pointerHi
-    lda TextTableLo,y 
-    sta pointerLo
-
-   ; tya         ; im going to push y on to the stack so i can get it back before leaving because its the gameobject offset and i can't lose it cause linked list
-    ;pha 
-    ldy #00     ; setting y to 0 to get the count from the text image data table
-   ; lda (pointerLo),y   ; this should be the count 
- ;   tax         
-    
-@DrawTextLoopStart:
-    lda #$40
-    cmp spriteBufferLo
-    bcc @HaveNotLooped
-    sta spriteBufferLo
-@HaveNotLooped:
-    lda (pointerLo),y           ; this is either the y offset or FF to terminate
-    cmp #$FF                  ; when the count reaches 0 we are at the end of the text data
-    beq @DrawLoopEnd 
-    ; we need to get the y pos offset from the text table,
-    ;lda (pointerLo),y 
-    ; then add it to the anchor y pos (temp2)
-    clc 
-    adc temp2 
-    ; store it in buffer                                ; ok wait. so i need to use an offset to store it in buffer. but i think i have to use y. maybe i can use x? that would be nice but thats my count
-    sta (spriteBufferLo),y
-    ; inc y 
-    iny 
-
-
-    ; we have to grab the tile from the image data
-    lda (pointerLo),y
-    ; store that in buffer
-    sta (spriteBufferLo),y 
-    ; inc y for next tile data
-    iny 
-    
-    ; next is att. im going to grab it from ROM for now
-    lda (pointerLo),y 
-    ; store it in the buffer
-    sta (spriteBufferLo),y 
-    iny 
-
-    ; we need to get the x pos from the text table
-    lda (pointerLo),y 
-    ; add it to the x anchor
-    clc 
-    adc temp1
-    ; store that in buffer
-    sta (spriteBufferLo),y 
-    iny 
-    ; i think thats it 
-    jmp @DrawTextLoopStart
-@DrawLoopEnd:
-
-    ; at this point. each character should be ready to be displayed. so now i just have to save where the buffer pointer is and then im done
-    tya 
-    clc 
-    adc spriteBufferLo
-    sta spriteBufferLo 
- ;   ; oh and get the gameObject offset back off the stack
- ;   pla 
-  ;  tay 
-    rts 
-
-DrawTextStatic2:
-    ; ok this is the improved version
-    ; we are going to use the animation offset that all game objects have to know which text table we want to display.
-                                        ; random thought, when do animation timers and such get updated? during this draw function? or when i guess its more important with like player character. this is def a thing that i'll understand better when im working on more complicated game objects
-    ldy objectAnimationOffset,x
-    lda TextTableLo,y 
-    sta pointerLo
-    lda TextTableHi,y 
-    sta pointerHi
-
-    ; this function should either return, or set one of my pointers to the address of the text table
-    rts 
-
-
 DeleteEngine:
     ldx #$00
 @DeleteEngineLoopStart:
@@ -3041,143 +2639,26 @@ DeleteEngine:
     ldx stupidTemp
     jmp @DeleteEngineLoopStart
 @DoneDeletingGameObjects:
-    rts 
+    rts
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;   Draw Engine
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; so i have no clue how to do this smartly
-; my only idea right now is just shifting things like 3 % objectmax indexes? idk
-ShuffleGameObjects:
-
-    ; first we need some sort of rng
-    lda vblankCounter   ; right now we using the global timer. im not sure what a better way right now if there is one
-  ; im too tired ill finish this laters    ; this will make it be within range
-    rts 
-
-
-; Ok so the next thing I want to add is making the player character be multiple sprites, and then have animations based off those states.
-        ; this is going to probably be a major overhaul of how the player works, but again this is the meat of the shit. the game design is the easy part.
-; this should be just like every other draw function;
-    ; I get the animation offset, and the state? wait no the draw function would care not the drawengine. so here i use state. i didn't with text cause it has 1 state. I guess it could if i had it loaded but turned off.
-DrawPlayer:
-
-    ; first we use the state of the player 
-    ldx playerState2    ; im using player state 2 until im down reworking all the player shit
-    lda PlayerMetaSpriteDataLo,x 
-    sta pointerLo
-    lda PlayerMetaSpriteDataHi,x
-    sta pointerHi
-
-    ; based off the state, we then use the facing direction
-    lda playerFaceingDirection
-    asl 
-    tay 
-    lda (pointerLo),y
-    sta pointer2Lo
-    iny 
-    lda (pointerLo),y 
-    sta pointer2Hi
-
-    ; and finally based off that, we use the animation counter to finally store the sprite meta data address in pointerLo and pointerHi for the draw engine to write to OAM
-    lda playerAnimationCounter
-    and #$01
-  ;  cmp #$0F
-  ;  lda playerAnimationCounter2
- ;   bne @dontSwap 
-  ;  clc 
-  ;  adc #$01
- ;   and #$01
-  ;  ora #$01
-
-@dontSwap:
-    asl 
-    tay 
-    lda (pointer2Lo),y 
-    sta pointerLo
-    iny 
-    lda (pointer2Lo),y 
-    sta pointerHi
- 
-    rts 
-
-PLAYER_TEST_SPRITE = $023C
-DrawPlayerBad:
+DrawEngine:
     jsr DrawPlayer
-    ldx #$00
-    ldy #$00
 
-    lda (pointerLo),y 
-    sta PLAYER_TEST_SPRITE,y
-    iny 
-    
-    lda (pointerLo),y 
-    sta PLAYER_TEST_SPRITE,y
-    iny 
-
-    lda (pointerLo),y 
-    sta PLAYER_TEST_SPRITE,y
-    iny 
-
-    lda (pointerLo),y 
-    sta PLAYER_TEST_SPRITE,y
-
-    rts 
-
-
-; this is supposed to be a generic game object drawing subroutine
-; it will basically be the same as the player
-    ; i think I need to have like, another table that has each gameobject type first?
-    ; which is that better or should each game object have its own draw function? 
-        ; i mean how many types do i have? human? player? text? clock? score? ui? 
-; ok fuck the generic. lets draw the clock, could possibly be turned into draw UI or something. which would be cool
-FIFTEEN_SECONDS = %01000000
-
-; ok so I have 3 variables holding the offsets for the ROM metasprite tables
-DrawClock:
-
-    rts 
-
-; ok lets do this one more time baby
-;DrawEngine2:
-    
-    ; this time we will be iterating through the game object offsets in the offset array
-    ; i still need to write the shuffling thing for them..
-
-    ;lda #SPRITE_BUFFER_START    ; reset offset to be at where I want to start putting game object sprite data
-   ; sta spriteBufferOffset
-
-   ; ldx #$00
-;@DrawEngine2LoopStart:
-   ; lda GAME_OBJECT_OFFSET,x 
-   ; cmp gameObjectCounter              ; gameObjectCounter is the index of the first empty slot or 1 past end so we iterate till we reach it
-   ; beq @DoneDrawingGameObjects
-   ; sta currentGameObjectOffset
-   ; tax 
-   ; sta stupidTemp                  ; why do i write code this fucking tired
-  ;  inc stupidTemp  ; please god be sorta right  
-  ;  jsr DrawEngineJmp2
-  ;  ldx stupidTemp
-  ;  jmp @DrawEngine2LoopStart
-
-;@DoneDrawingGameObjects:
-   ; rts 
-
-
-
-DrawPlayer2:
-    rts 
-
-
-
-DrawEngine2:
-    jsr DrawPlayer2
-
-    lda #$40
+    lda GAME_OBJECT_OAM_OFFSET_START
     sta spriteBufferOffset
     ; lets focus on just getting game objects drawn fuck everything else right now
     lda #$00
-@DrawEngine2LoopStart:
+@DrawEngineLoopStart:
     cmp gameObjectCounter
-    beq @DoneDrawingGameObjects2
+    beq @DoneDrawingGameObjects
 
     ; we need to get the next game object offset
     tax 
@@ -3185,36 +2666,114 @@ DrawEngine2:
     sta currentGameObjectOffset     ; storing the current game object offset
     tay 
     stx stupidTemp
-    jsr DrawEngineJmp2
+    jsr DrawEngineJmp
     inc stupidTemp
     lda stupidTemp
-    jmp @DrawEngine2LoopStart
+    jmp @DrawEngineLoopStart
 
-@DoneDrawingGameObjects2:
+@DoneDrawingGameObjects:
     ; need to write FE till we reach the end to clear garbage
     ldx spriteBufferOffset
     lda #$FE
-@ClearingGarbageLoopStart2:
+@ClearingGarbageLoopStart:
     cpx #$00
-    beq @DoneClearingGarbage2
-    sta SPRITE_BUFFER_START,x 
-    sta SPRITE_BUFFER_START + 1,x 
-    sta SPRITE_BUFFER_START + 2,x 
-    sta SPRITE_BUFFER_START + 3,x 
+    beq @DoneClearingGarbage
+    sta SPRITE_OAM_START,x 
+    sta SPRITE_OAM_START + 1,x 
+    sta SPRITE_OAM_START + 2,x 
+    sta SPRITE_OAM_START + 3,x 
     inx 
     inx 
     inx 
     inx 
-    jmp @ClearingGarbageLoopStart2
-@DoneClearingGarbage2: 
+    jmp @ClearingGarbageLoopStart
+@DoneClearingGarbage: 
     rts 
 
-DrawEngineJmp2:
+DrawEngineJmp:
     lda objectDrawLo,y 
     pha 
     lda objectDrawHi,y  
     pha 
     rts 
+
+
+
+; this should work. maybe i messed up some of the pointer shit but the logic is right. it would be little tweaks in the syntax 
+; this is law now. ok time to work backwards fixing the hell i created at the beginning of this project.
+
+PLAYER_STANDING_DOWN_ANIMATION_TIME     = $0F
+DrawPlayer:
+    ; so same idea as any general game object
+    ; use the state as offset on PlayerMetaSpriteDataLo/Hi to get the PlayerSTATE
+    ; use the frame offset on PlayerState to get the meta sprite table of which tiles and attributes to use.
+    ; the player sprite OAM addresses are going to be set cause there is no reason not to
+    ; and so i just use the player pos as the achor, and place tiles (maybe i should have x and y offsets in the meta sprite table to just make shit easier. so I don't have to have temp shit and clc adc all the time.) i think ima do that
+    
+    lda playerFacingDirection
+    asl 
+    tay 
+    ldx PlayerState
+
+    lda PlayerMetaSpriteDataLo,x 
+    sta pointerLo
+    lda PlayerMetaSpriteDataHi,x 
+    sta pointerHi
+
+    lda (pointerLo),y 
+    sta pointerLo2 
+    iny 
+    lda (pointerLo),y 
+    sta pointerHi2
+
+    lda playerAnimationOffset
+    asl 
+    tay 
+
+    lda (pointer2Lo),y 
+    sta pointerLo
+    iny 
+    lda (pointer2Lo),y 
+    sta pointerHi
+
+    ldy #$00
+    ldx #$00
+
+@DrawPlayerLoopStart:
+
+    lda (pointerLo),y               ; y offset
+    clc 
+    adc playerYPos
+    sta PLAYER_OAM_START,y 
+
+    lda (pointerLo),y + 1           ; tile
+    sta PLAYER_OAM_START,y + 1
+
+    lda (pointerLo),y + 2           ; attribute
+    sta PLAYER_OAM_START,y + 2
+
+    lda (pointerLo),y + 3
+    clc 
+    adc playerXPos
+    sta PLAYER_OAM_START,y + 3
+
+    cpx PLAYER_TILE_COUNT           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
+    beq @DoneDrawingPlayer
+
+    iny                             ; increment y by 4 to start accessing next sprite meta data
+    iny 
+    iny 
+    iny 
+    inx                             ; inc loop counter
+
+    jmp @DrawPlayerLoopStart
+
+@DoneDrawingPlayer:
+    rts 
+
+
+
+
 
 
 
@@ -3302,19 +2861,19 @@ DrawPerson:
     lda (pointer2Lo),y          ; y pos
     clc 
     adc currentY
-    sta SPRITE_BUFFER_START,x 
+    sta SPRITE_OAM_START,x 
 
     
     lda (pointer2Lo + 1),y          ; tile
-    sta SPRITE_BUFFER_START + 1,x 
+    sta SPRITE_OAM_START + 1,x 
     
     lda (pointer2Lo + 2),y          ; att
-    sta SPRITE_BUFFER_START + 2,x 
+    sta SPRITE_OAM_START + 2,x 
 
     lda (pointer2Lo + 3),y          ; x pos
     clc  
     adc currentX
-    sta SPRITE_BUFFER_START + 3,x 
+    sta SPRITE_OAM_START + 3,x 
 
     iny 
     iny 
@@ -3422,16 +2981,16 @@ clearnametables:
     ; setting DMA pointer
 
         ; ok so lets try and initialize the spriteRam pointer
- ;   lda spriteramstart
+ ;   lda GAME_OBJECT_RAM_START
    ; sta FirstFreeSlot      ; i think this is really stupid and wrong
    ; lda #$00
     ;sta NextFreeSlot
 
     ; so lets set the hi byte of the pointer to $03, and then the first and next slot to $00
     ; that should make it so when we add to next, it will start at address $0300, and then will be pointing at $0308, while first still points at $00, tbh idk if we need a first then... im kind of confused on why
-    lda #<spriteRamStart
+    lda #<GAME_OBJECT_RAM_START
     sta gameObjectLo
-    lda #>spriteRamStart
+    lda #>GAME_OBJECT_RAM_START
     sta gameObjectHi
 
 
@@ -3472,7 +3031,6 @@ Main:
 
     jsr DeleteEngine
     jsr DrawEngine
-    jsr DrawPlayerBad
 
     ;jsr CopyObjectRamToSpriteRam
 
@@ -3560,20 +3118,102 @@ DefaultObjectStartLo:
 DefaultObjectStartHi:
     .byte >ScottStartingData
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;   Player Animation Tables
+;
+;           PlayerState:                                    Facing Direction:
+;                           0   -   Standing                                    0   -   Down    
+;                           1   -   Walking                                     1   -   Left
+;                           2   -                                               2   -   Up
+;                           3                                                   3   -   Right
+;                           4    
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PLAYER_TILE_COUNT = 6
 PlayerMetaSpriteDataLo:
-    .byte <PlayerStandingMetaSpriteData, <PlayerWalkingMetaSpriteData
+    .byte <PlayerStanding, <PlayerWalking
 PlayerMetaSpriteDataHi:
-    .byte >PlayerStandingMetaSpriteData, >PlayerWalkingMetaSpriteData
+    .byte >PlayerStanding, >PlayerWalking
 
 
-PlayerStandingMetaSpriteData:
-    .byte <PlayerStandingRightLeftMetaData, >PlayerStandingRightLeftMetaData, <PlayerStandingUpDownMetaData, >PlayerStandingUpDownMetaData
-PlayerWalkingMetaSpriteData:
-    .byte <PlayerWalkingRightLeftMetaData, >PlayerWalkingRightLeftMetaData, <PlayerWalkingUpDownMetaData, >PlayerWalkingUpDownMetaData
+PlayerStanding:
+    .byte <PlayerStandingDown, >PlayerStandingDown, <PlayerStandingLeft, >PlayerStandingLeft, <PlayerStandingUp, >PlayerStandingUp, <PlayerStandingRight, <PlayerStandingRight
+PlayerWalking:
+    .byte <PlayerWalkingDown, >PlayerWalkingDown, <PlayerWalkingLeft, >PlayerWalkingLeft, <PlayerWalkingUp, >PlayerWalkingUp, <PlayerWalkingRight, >PlayerWalkingRight
+
+PlayerStandingDown:
+    .byte <PlayerStandingDownFrame1, >PlayerStandingDownFrame1, <PlayerStandingDownFrame2, >PlayerStandingDownFrame2
+PlayerStandingLeft:
+    .byte <PlayerStandingLeftFrame1, >PlayerStandingLeftFrame1, <PlayerStandingLeftFrame2, >PlayerStandingLeftFrame2
+PlayerStandingUp:
+    .byte <PlayerStandingUpFrame1, >PlayerStandingUpFrame1, <PlayerStandingUpFrame2, >PlayerStandingUpFrame2
+PlayerStandingRight:
+    .byte <PlayerStandingRightFrame1, >PlayerStandingRightFrame1, <PlayerStandingRightFrame2, >PlayerStandingRightFrame2
+
+PlayerWalkingDown:
+    .byte <PlayerWalkingDownFrame1, >PlayerWalkingDownFrame1, <PlayerWalkingDownFrame2, >PlayerWalkingDownFrame2
+PlayerWalkingLeft:
+    .byte <PlayerWalkingLeftFrame1, >PlayerWalkingLeftFrame1, <PlayerWalkingLeftFrame2, >PlayerWalkingLeftFrame2
+PlayerWalkingUp:
+    .byte <PlayerWalkingUpFrame1, >PlayerWalkingUpFrame1, <PlayerWalkingUpFrame2, >PlayerWalkingUpFrame2
+PlayerWalkingRight:
+    .byte <PlayerWalkingRightFrame1, >PlayerWalkingRightFrame1, <PlayerWalkingRightFrame2, >PlayerWalkingRightFrame2
 
 
-PlayerStandingRightLeftMetaData:
-    .word PlayerStandingRightLeftMetaData1, PlayerStandingRightLeftMetaData2
+; TopLeft Tile Location:            frame 1     frame 2
+;                           Down:      88           8A
+;                           Left:      8C           8E
+;                           Up:        B8           BA
+; left to right top to bottom:                  y offset, Tile, Attribute, x offset
+PlayerStandingDownFrame1:
+    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $98, $00, $00,     $08, $99, $00, $08,     $10, $A8, $00, $00,     $10, $A9, $00, $08
+PlayerStandingDownFrame2:
+    .byte $00, $00, $8A, $00,   $00, $8B, $00, $08,     $08, $9A, $00, $00,     $08, $9B, $00, $08,     $10, $AA, $00, $00,     $10, $AB, $00, $08
+
+PlayerStandingLeftFrame1:
+    .byte $00, $8C, $00, $00,   $00, $8D, $00, $08,     $08, $9C, $00, $00,     $08, $9D, $00, $08,     $10, $AC, $00, $00,     $10, $AD, $00, $08
+PlayerStandingLeftFrame2:
+    .byte $00, $8E, $00, $00,   $00, $8F, $00, $08,     $08, $9E, $00, $00,     $08, $9F, $00, $08,     $10, $AE, $00, $00,     $10, $AF, $00, $08
+
+
+PlayerStandingUpFrame1:
+    .byte $00, $B8, $00, $00,   $00, $B9, $00, $08,     $08, $C8, $00, $00,     $08, $C9, $00, $08,     $10, $D8, $00, $00,     $10, $D9, $00, $08
+PlayerStandingUpFrame2:
+    .byte $00, $BA, $00, $00,   $00, $BB, $00, $08,     $08, $CA, $00, $00,     $08, $CB, $00, $08,     $10, $DA, $00, $00,     $10, $DB, $00, $08
+
+
+PlayerStandingRightFrame1:
+    .byte $00, $8C, $40, $00,   $00, $8D, $40, $08,     $08, $9C, $40, $00,     $08, $9D, $40, $08,     $10, $AC, $40, $00,     $10, $AD, $40, $08
+PlayerStandingRightFrame2:
+    .byte $00, $8E, $40, $00,   $00, $8F, $40, $08,     $08, $9E, $40, $00,     $08, $9F, $40, $08,     $10, $AE, $40, $00,     $10, $AF, $40, $08
+
+
+PlayerWalkingDownFrame1:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+PlayerWalkingDownFrame2:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+
+PlayerWalkingLeftFrame1:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+PlayerWalkingLeftFrame2:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+
+PlayerWalkingUpFrame1:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+PlayerWalkingUpFrame2:
+    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+
+PlayerWalkingRightFrame1:
+    .byte $00, $40, $00, $40,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+PlayerWalkingRightFrame2:
+    .byte $00, $40, $00, $40,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+
+    
+   
 
 
 PlayerStandingRightLeftMetaData1:
@@ -3593,9 +3233,6 @@ PlayerStandingUpDownMetaData2:
     .byte $A0, $20, $00, $20
     .byte $FF
 
-PlayerWalkingRightLeftMetaData:
-
-PlayerWalkingUpDownMetaData:
 TextTableLo:
     .byte <SampleText, <SampleText2
 TextTableHi:
