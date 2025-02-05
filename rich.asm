@@ -1221,11 +1221,6 @@ DoNothing:
     rts 
 
 
-; lets assume we have the address to the subroutine we want to jump to on the stack.
-; this is only jumping to subroutines so need to -1 from lo address
-JumpEngine:
-    rts 
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1246,20 +1241,117 @@ PlayerLogic:
 
     ldx playerState
     lda PlayerGameLoopSubroutinesLo,x 
-    pha 
+    sta pointerLo 
     lda PlayerGameLoopSubroutinesHi,x 
-    pha 
+    sta pointerHi 
 
-    jsr JumpEngine
+    jmp (pointerLo)
+    ; 1/23/25
+        ; ok so after the state based subroutine rts's it will come back here.  
+        ; I'm not sure what else needs to be done. let me map out what a state based subroutine might look like with standing and see what is left to do
 
     
     ; 
     rts 
 PlayerGameLoopSubroutinesLo:
-    .byte <DoNothing - 1
+    .byte <PlayerStanding
 PlayerGameLoopSubroutinesHi:
-    .byte >DoNothing
+    .byte >PlayerStanding
 
+
+PlayerStanding:
+    ; 1/23/25
+        ; so what can happen when im standing? basically its based on the user input?
+        ; like
+    
+    ; 1/24/25
+        ; ok i think i got an idea that works for now
+        ; we do, based off input from previous frame,
+            ; stay in same state
+                ; update animation timer
+                    ; update animation offset if needed
+            ; change state
+                ; read from rom new default state info needed
+                ; update playerState to new state
+                ; update playerAnimationTimer to 0
+    ; 2/4/25
+        ; ok i am feeling overwhelmed and like i don't know shit so lets lower the scope and get something working so i can play around with it and figure out a better way later
+        ; lets focus on moving. which would change the state to walking.
+    lda controller1Pressed
+    and #$0F
+    cmp #$00
+    bne @PlayerStandingNowWalking
+    ; ok so if i have directional input, i will skip all this and go to the subroutine to switch my state to walking.
+        ; this means that i need to set up all the shit in that routine and i need to not care about it here
+        ; what I care about now is I am still standing. so i need to update the animation crap.
+    inc playerAnimationTimer
+    ; this uses the animation frame offset, to get the amount of time we want to be in that frame
+        ; compares it to the animation timer. 
+            ; if they are not equal, then we should still be in this frame and we are done
+            ; if they are equal, then we need to...
+                ; lets reset the timer -  i know its a bad way but it makes the code more clear for now
+                ; increase the frame offset
+                    ; check the new frame offset against the frame count constant
+                        ; reset frame offset to 0 if they are equal
+    ldx playerAnimationOffset
+    lda PlayerStandingAnimationFrameTimes,x
+    cmp playerAnimationTimer
+    bne @DonePlayerStanding
+    ldy #$00
+    sty playerAnimationTimer
+    inc playerAnimationOffset
+    lda PLAYER_STANDING_ANIMATION_FRAME_COUNT
+    cmp playerAnimationOffset
+    bne @DonePlayerStanding
+    sty playerAnimationOffset
+    jmp @DonePlayerStanding
+
+@PlayerStandingNowWalking:
+    jsr PlayerStateChangeToWalking
+
+@DonePlayerStanding:
+    rts 
+
+PLAYER_STANDING_ANIMATION_FRAME_COUNT   =   #2
+PlayerStandingAnimationFrameTimes:
+    .byte $FF, $88 
+
+
+PlayerStateChangeToWalking:
+    ; first lets just reset the animation variables to 0
+    lda #$00
+    sta playerAnimationOffset
+    sta playerAnimationTimer
+
+    ; oh we should probably store the new state too...
+    lda #$01
+    sta playerState
+    
+    ; next we need to figure out which way we are going
+        ; update facing direction if needed
+        ; idk how to do movement but we need some sort of physics shit to not hard code the movement to sprite display information
+    
+    ; there has to be some hierarchy of which way if multiple inputs are pressed at the same time.
+    ; just shift to the right into the carry
+    lda controller1Pressed
+    lsr ; this should be right
+    bcc @NotStartingMovingRight
+
+@NotStartingMovingRight:
+    lsr 
+    bcc @NotStartingMovingLeft
+
+@NotStartingMovingLeft:
+    lsr 
+    bcc @NotStartMovingDown
+
+@NotStartMovingDown:
+    lsr 
+    bcc @DoneStartMovingFacingDir
+
+@DoneStartMovingFacingDir
+    
+    rts 
 
 PlayerLogic:
     lda playerState         ; Drinking - Walking - Peeing - Smoking - interacting - X - Facing Direction ( 0: Down    1: Left     2: Up   3: Right )
