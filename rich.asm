@@ -1496,6 +1496,7 @@ DetermineFacingDirection:
 
 ; i think there is a cuter way to do this with offsets. i will look into that when i revisit. not a priority rn but i can see how that pattern really can be used everywhere. and since its basically the onlything the cpu can do i assume i should be using it where i can
 ApplyPlayerFriction:
+
     ; basically we need to know if we are moving + or -. and then add the opposite. idk if we need to round to 0 here? or somehwere else. somewhere else seems right but i don't know why yet so i'll do it here
     lda playerVxHi 
     asl     ; should store the msb in the carry so we can use that 
@@ -1549,8 +1550,73 @@ ApplyPlayerFriction:
 @DonePlayerFriction:
     rts                                        
 
-CheckMovingTooSlow:
+; because right now i'm applying friction to Vx and Vy without checking if I should... I need set V to 0 if it is between - Friction coef < V < + friction coef
+; there's a zero flag that i can use... so just check z flag. is there a branch... bzs? bpl bmi
+    ; i guess its branch minus and branch plus
+
+; i might have fucked up the +/- 1. it made sense when i was writing it but 2 seconds later it doens't. it has to do with being exactly the coef and wanting or not wanting that to be included in the range.
+
+CheckPlayerMovingTooSlow:
+    lda playerVxHi
+    bpl @CheckPlayerMovingVxPositive
+
+    ; this is checking if Vx is negative. so it should be Hi = $FF and lo > FRICTION_COEF_LO - 1
+    cmp #$FF
+    bne @VxTooFast
+    lda playerVxLo
+    cmp FRICTION_COEF_NEGATIVE_X_HI - 1
+    bcs @VxTooFast
+    lda #$00
+    sta playerVxHi
+    sta playerVxLo
+    jmp @VxTooFast
+
+    ; this is checking if Vx is postitive. so it should be Hi = $00 and lo < FRICTION_COEF + 1
+@CheckPlayerMovingVxPositive:
+    cmp #$00
+    bne @VxTooFast
+    lda playerVxLo 
+    cmp FRICTION_COEF_POSITIVE_X_LO + 1
+    bcc @VxTooFast
+    lda #$00
+    sta playerVxLo 
+    sta playerVxHi
+
+@VxTooFast:
+    lda playerVyHi
+    bpl @CheckPlayerMovingVyPositive
+    cmp #$FF
+    bne @VyTooFast
+    lda playerVyLo
+    cmp FRICTION_COEF_NEGATIVE_Y_LO - 1
+    bcs @VyTooFast
+    lda #$00
+    sta playerVyLo
+    sta playerVyHi 
+    jmp @VyTooFast
+
+@CheckPlayerMovingVyPositive:
+    cmp #$00        ; i think there is a zero flag but that can be fixed later
+    bne @VyTooFast
+    lda playerVyLo 
+    cmp FRICTION_COEF_POSITIVE_Y_LO + 1
+    bcc @VyTooFast
+    lda #$00
+    sta playerVyHi
+    sta playerVyLo
+
+@VyTooFast:
     rts 
+
+    
+SetPlayerVelocityToZero:
+    lda #$00
+    sta playerVxHi
+    sta playerVxLo 
+    sta playerVyHi
+    sta playerVyLo 
+    rts 
+
 
 ControllerLogic:
     jsr ReadController1
@@ -1570,13 +1636,7 @@ ControllerLogic:
     sta controller1PreviousInput
     rts 
 
-SetPlayerVelocityToZero:
-    lda #$00
-    sta playerVxHi
-    sta playerVxLo 
-    sta playerVyHi
-    sta playerVyLo 
-    rts 
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
