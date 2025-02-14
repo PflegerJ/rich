@@ -33,8 +33,6 @@
     deleteBufferOffset: .res 1
     deleteFlag:         .res 1
     controller1:    .res 1  ; controller 1 byte to store what buttons are pressed each frame
-   ; playerXpos:     .res 1  
-   ; playerYpos:     .res 1
     nameTable:      .res 1  ; which nametable to load
     roomIndex:      .res 1  ;;;; could make it bits 765, for previous roomIndex. and bits 210 are for current roomIndex?
     spriteCount:    .res 1
@@ -82,13 +80,8 @@
     controller1PreviousInput:   .res 1
     controller1Pressed:         .res 1
     controller1Held:            .res 1
-   ; playerState2:               .res 1
-    ;playerFaceingDirection:     .res 1
-    ;playerState:                .res 1 ; Drinking - Smoking - Peeing - Walking - (5-8) Beers in Inv ;; this is so wrong im not sure whats right. but im pretty sure 0 and 1 are facign dir idk which... 
-    ;playerAnimationCounter:             .res 1  
-    ;playerAnimationCounter2:    .res 1
-    ;; Constants
-
+    
+    
     distanceTestValueX:       .res 1
     distanceTestValueY:       .res 1
     distanceTestResult:       .res 2
@@ -100,14 +93,9 @@
     ;;; player variables ;;; will clean up any player variable that is above this line when done with this shit
 
     playerState:                .res 1
-    playerXPos:                 .res 1
-    playerSFloat:               .res 1
-    playerYPos:                 .res 1
-    playerYFloat:               .res 1
     playerFacingDirection:      .res 1
     playerAnimationOffset:      .res 1
     playerAnimationTimer:       .res 1
-    playerSpeed:                .res 1
 
     ; this is based off 8.8 fixed point arithmetic and 2's complement bullshit.
     playerPxLo:                 .res 1
@@ -120,14 +108,15 @@
     playerVyHi:                 .res 1
     playerVyLo:                 .res 1
 
+    ; this might be not needed at all in anyway
     playerAxHi:                 .res 1
     playerAxLo:                 .res 1
     playerAyHi:                 .res 1
     playerAyLo:                 .res 1
 
-    PLAYER_V_CAP            = #7
-    PLAYER_ACCELERATION_HI  = #$00
-    PLAYER_ACCELERATION_LO  = #$80
+    PLAYER_V_CAP            = 7
+    PLAYER_ACCELERATION_HI  = $00
+    PLAYER_ACCELERATION_LO  = $80
 
     OBJECT_DELETE_BUFFER  = $30
     PPU_CTRL_REG1         = $2000
@@ -144,6 +133,7 @@
     JOYPAD_PORT1          = $4016
     JOYPAD_PORT2          = $4017
 
+    SPRITE_RAM            = $0200
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -156,13 +146,13 @@
     UI_OAM_START                    = $0200     ; UI will be the first sprite slots i guess. something something sprite 0 hits something something
     PLAYER_OAM_START                = $0220     ; randomly chose this
     GAME_OBJECT_OAM_START           = $0240     ; i want this to be as big as possible. just depends on how many UI sprites I will need
-    GAME_OBJECT_OAM_OFFSET_START    = #$40
+    GAME_OBJECT_OAM_OFFSET_START    = $40
 
 
 
 
     TIMER_OAM_START       = $0208
-    TIMER_OAM_HOUR_TENS = $0208
+    TIMER_OAM_HOUR_TENS     = $0208
     TIMER_OAM_HOUR_ONES = $020C
     TIMER_OAM_MIN_TENS  = $0210
     TIMER_OAM_MIN_ONES  = $0214    
@@ -295,18 +285,7 @@ vblankwait:
     bpl vblankwait
     rts
 
-loadSprites:
-    ;lda spriteCount   ; this will be used when each map knows how many sprites it has on load
-   ; asl
-    ;asl
-    ldx #$00
-spriteLoop:
-    lda sprites, X
-    sta SPRITE_RAM, X
-    inx
-    cpx #$34
-    bne spriteLoop
-    rts
+
 
 updateSprites:
     lda #<SPRITE_RAM
@@ -436,153 +415,13 @@ setPlayerStartingPos:
     sta pointerHi
     ldy #$00
     lda (pointerLo), Y
-    sta playerXpos
+    sta playerPxHi
     iny
     lda (pointerLo), Y
-    sta playerYpos
+    sta playerPyHi
     rts
 
-moveUp:
-    dec playerYpos
-    lda playerYpos
-    clc
-    adc #$01
-    tay
-    ldx playerXpos
-    jsr check_background_collision
-    beq @checkRightPixel
-    inc playerYpos
 
-@checkRightPixel:
-    lda playerYpos
-    clc
-    adc #$01
-    tay
-    lda playerXpos
-    clc
-    adc #$07
-    tax
-    jsr check_background_collision
-    beq @noCollision
-    inc playerYpos
-    rts
-
-@noCollision:
-    jsr checkLoadingZone
-    lda temp1
-    cmp #$FF
-    bne @NoLoadingZoneFound
-    jsr LoadRoom
-   ; jsr loadbackground
-@NoLoadingZoneFound:
-    rts
-
-moveDown:
-    inc playerYpos
-    lda playerYpos
-    clc
-    adc #$08
-    tay
-    ldx playerXpos
-    jsr check_background_collision
-    beq @checkRightPixel
-    DEC playerYpos
-
-@checkRightPixel:
-    lda playerYpos
-    clc
-    adc#$08
-    tay
-    lda playerXpos
-    clc
-    adc #$07
-    tax
-    jsr check_background_collision
-    beq @noCollision
-    dec playerYpos
-    rts
-
-@noCollision:
-    jsr checkLoadingZone
-    lda temp1
-    cmp #$FF
-    bne @NoLoadingZoneFound
-    jsr LoadRoom
-   ; jsr loadbackground
-@NoLoadingZoneFound:
-    rts
-
-;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
-moveRight:
-    inc playerXpos
-    lda playerXpos
-    clc
-    adc #07
-    tax 
-    lda playerYpos
-    clc
-    adc #$01
-    tay
-    jsr check_background_collision
-    beq @checkBottomPixel
-    dec playerXpos
-
-@checkBottomPixel:
-    lda playerXpos
-    clc
-    adc #$07
-    tax
-    lda playerYpos
-    clc
-    adc #$08
-    tay
-    jsr check_background_collision
-    beq @noCollision
-    dec playerXpos
-    rts 
-@noCollision:
-    jsr checkLoadingZone
-    lda temp1
-    cmp #$FF
-    bne @NoLoadingZoneFound
-    jsr LoadRoom
-    ;jsr loadbackground
-@NoLoadingZoneFound:
-    rts 
-
-
-
-moveLeft:
-    dec playerXpos
-    ldx playerXpos
-    lda playerYpos
-    clc
-    adc #$01
-    tay
-    jsr check_background_collision
-    beq @checkBottomPixel
-    inc playerXpos
-
-@checkBottomPixel:
-    ldx playerXpos
-    lda playerYpos
-    clc
-    adc #$08
-    tay
-    jsr check_background_collision
-    beq @noCollision
-    inc playerXpos
-    rts
-
-@noCollision:
-    jsr checkLoadingZone
-    lda temp1
-    cmp #$FF
-    bne @NoLoadingZoneFound
-    jsr LoadRoom
-   ; jsr loadbackground
-@NoLoadingZoneFound:
-    rts 
 
 
 
@@ -652,10 +491,10 @@ checkLoadingZone:
     lda LoadZoneHi, X
     sta pointerHi
 
-    lda playerXpos          ; remove last 8 bits - each tile is 8x8 bits so no need to check last 8
+    lda playerPxHi          ; remove last 8 bits - each tile is 8x8 bits so no need to check last 8
     and #%11111000
     sta temp1
-    lda playerYpos
+    lda playerPyHi
     clc
     adc #$01
     and #%11111000
@@ -1072,7 +911,7 @@ Proximity:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Distance1:
     ; first find a^2
-    lda playerXpos
+    lda playerPyHi
     cmp distanceTestXpos    ; this needs to be changed to scotts sprite? hmmmm
     bcc @DistanceXBigger ; branch if distanceTestX is bigger
     sec 
@@ -1083,11 +922,11 @@ Distance1:
 @DistanceXBigger:
     lda distanceTestXpos
     sec 
-    sbc playerXpos
+    sbc playerPxHi
     sta distanceTestValueX
 
 @CalcYDiff:
-    lda playerYpos
+    lda playerPyHi
     cmp distanceTestYpos
     bcc @DistanceYBigger ; brance if distanceTestY is bigger
     sec 
@@ -1098,7 +937,7 @@ Distance1:
 @DistanceYBigger:
     lda distanceTestYpos
     sec 
-    sbc playerYpos
+    sbc playerPyHi
     sta distanceTestValueY
 
 @Squaring:
@@ -1274,12 +1113,12 @@ PlayerLogic:
     ; 
     rts 
 PlayerGameLoopSubroutinesLo:
-    .byte <PlayerStanding, <PlayerWalking
+    .byte <PlayerStandingLogic, <PlayerWalkingLogic
 PlayerGameLoopSubroutinesHi:
-    .byte >PlayerStanding, >PlayerWalking
+    .byte >PlayerStandingLogic, >PlayerWalkingLogic
 
 
-PlayerStanding:
+PlayerStandingLogic:
     ; 1/23/25
         ; so what can happen when im standing? basically its based on the user input?
         ; like
@@ -1320,7 +1159,7 @@ PlayerStanding:
     ldy #$00
     sty playerAnimationTimer
     inc playerAnimationOffset
-    lda PLAYER_STANDING_ANIMATION_FRAME_COUNT
+    lda #PLAYER_STANDING_ANIMATION_FRAME_COUNT
     cmp playerAnimationOffset
     bne @DonePlayerStanding
     sty playerAnimationOffset
@@ -1333,7 +1172,7 @@ PlayerStanding:
 @DonePlayerStanding:
     rts 
 
-PLAYER_STANDING_ANIMATION_FRAME_COUNT   =   #2
+PLAYER_STANDING_ANIMATION_FRAME_COUNT   =   2
 PlayerStandingAnimationFrameTimes:
     .byte $FF, $88 
 
@@ -1350,7 +1189,7 @@ ChangePlayerState:
         ; this feels wrong already. right now everything i do in walking i do in standing, except i guess not check input?
         ; i'm interested in how much the physics engine will show me im doing stuff wrong. thats bad english but i'm not editing 
         ; let yourself discover instead of theorize
-PlayerWalking:
+PlayerWalkingLogic:
     ; i need to check if they hit A or not cause i think you should be able to hit a while moving
     rts 
 
@@ -1384,24 +1223,24 @@ PhysicsEngine:
     beq @YesRightInput
     ; this is left input
         ; left is negative
-    lda PLAYER_X_ACCELERATION_NEGATIVE_LO
+    lda #PLAYER_X_ACCELERATION_NEGATIVE_LO
     clc 
     adc playerVxLo
     sta playerVxLo
 
-    lda PLAYER_X_ACCELERATION_NEGATIVE_HI
+    lda #PLAYER_X_ACCELERATION_NEGATIVE_HI
     adc playerVxHi 
     sta playerVxHi
     ; Idk if i should check for cap here or not. lets ignore the cap for now. cause just like every single design choice. i can see positive's and negatives for implementing now and for doing a catch all check at the end
 
     jmp @NoRightLeftInput   ; maybe a bad label name lol
 @YesRightInput:
-    lda PLAYER_X_ACCELERATION_POSITIVE_LO
+    lda #PLAYER_X_ACCELERATION_POSITIVE_LO
     clc 
     adc playerVxLo
     sta playerVxLo 
 
-    lda PLAYER_X_ACCELERATION_POSITIVE_HI
+    lda #PLAYER_X_ACCELERATION_POSITIVE_HI
     adc playerVxHi
     sta playerVxHi
 
@@ -1413,24 +1252,28 @@ PhysicsEngine:
     cmp #$00
     beq @NoUpDownInput
 
-    cmp #%00001000
+    cmp #%00000100
     bne @YesUpInput ; ima swap the beq to this bne. idk which makes more sense/is better right now. i'll examine later
     ; this is down
-    lda PLAYER_Y_ACCELERATION_POSITIVE_LO
+    lda #PLAYER_Y_ACCELERATION_POSITIVE_LO
     clc 
     adc playerVyLo 
     sta playerVyLo
 
-    lda PLAYER_Y_ACCELERATION_POSITIVE_HI
+    lda #PLAYER_Y_ACCELERATION_POSITIVE_HI
     adc playerVyHi 
     sta playerVyHi 
     jmp @NoUpDownInput
 
 @YesUpInput:
-    lda PLAYER_Y_ACCELERATION_NEGATIVE_LO
+    lda #PLAYER_Y_ACCELERATION_NEGATIVE_LO
     clc 
     adc playerVyLo
-    sta playerVyLo 
+    sta playerVyLo
+
+    lda #PLAYER_Y_ACCELERATION_NEGATIVE_HI
+    adc playerVyHi
+    sta playerVyHi 
 
     ; so now we have updated the player's velocity based off player input.
     ; 
@@ -1439,30 +1282,30 @@ PhysicsEngine:
 @NoPlayerPhysics:
     rts 
 
-PLAYER_X_ACCELERATION_POSITIVE_HI = #$00
-PLAYER_X_ACCELERATION_POSITIVE_LO = #$C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
-PLAYER_X_ACCELERATION_NEGATIVE_HI = #$FF
-PLAYER_X_ACCELERATION_NEGATIVE_LO = #$50
+PLAYER_X_ACCELERATION_POSITIVE_HI = $00
+PLAYER_X_ACCELERATION_POSITIVE_LO = $C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
+PLAYER_X_ACCELERATION_NEGATIVE_HI = $FF
+PLAYER_X_ACCELERATION_NEGATIVE_LO = $50
 
-PLAYER_Y_ACCELERATION_POSITIVE_HI = #$00
-PLAYER_Y_ACCELERATION_POSITIVE_LO = #$C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
-PLAYER_Y_ACCELERATION_NEGATIVE_HI = #$FF
-PLAYER_Y_ACCELERATION_NEGATIVE_LO = #$50
+PLAYER_Y_ACCELERATION_POSITIVE_HI = $00
+PLAYER_Y_ACCELERATION_POSITIVE_LO = $C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
+PLAYER_Y_ACCELERATION_NEGATIVE_HI = $FF
+PLAYER_Y_ACCELERATION_NEGATIVE_LO = $50
 
-PLAYER_Vx_POSITIVE_CAP = #$08
-PLAYER_Vy_POSITIVE_CAP = #$08
-PLAYER_Vx_NEGATIVE_CAP = #$F8
-PLAYER_Vy_NEGATIVE_CAP = #$F8
+PLAYER_Vx_POSITIVE_CAP = $08
+PLAYER_Vy_POSITIVE_CAP = $08
+PLAYER_Vx_NEGATIVE_CAP = $F8
+PLAYER_Vy_NEGATIVE_CAP = $F8
 
-FRICTION_COEF_POSITIVE_X_HI = #$00
-FRICTION_COEF_POSITIVE_X_LO = #$40
-FRICTION_COEF_NEGATIVE_X_HI = #$FF
-FRICTION_COEF_NEGATIVE_X_LO = #$E0
+FRICTION_COEF_POSITIVE_X_HI = $00
+FRICTION_COEF_POSITIVE_X_LO = $40
+FRICTION_COEF_NEGATIVE_X_HI = $FF
+FRICTION_COEF_NEGATIVE_X_LO = $E0
 
-FRICTION_COEF_POSITIVE_Y_HI = #$00
-FRICTION_COEF_POSITIVE_Y_LO = #$40
-FRICTION_COEF_NEGATIVE_Y_HI = #$FF
-FRICTION_COEF_NEGATIVE_Y_LO = #$E0
+FRICTION_COEF_POSITIVE_Y_HI = $00
+FRICTION_COEF_POSITIVE_Y_LO = $40
+FRICTION_COEF_NEGATIVE_Y_HI = $FF
+FRICTION_COEF_NEGATIVE_Y_LO = $E0
 ; I am going to assume i've calculated the players speed based off previous frame, and user input. i've done friction and everything else. this is just doing the 8.8 fixed point
 ; this is based off that one thread on nesdev. which is quite possibly the most useless comment i've ever written cause duh
 
@@ -1502,23 +1345,23 @@ ApplyPlayerFriction:
     asl     ; should store the msb in the carry so we can use that 
     bcs @PlayerVxIsNegative
     ; Vx is positive: so use negative friction coef
-    lda FRICTION_COEF_POSITIVE_X_LO
+    lda #FRICTION_COEF_NEGATIVE_X_LO
     clc 
     adc playerVxLo 
     sta playerVxLo 
 
-    lda FRICTION_COEF_POSITIVE_X_HI
+    lda #FRICTION_COEF_NEGATIVE_X_HI
     adc playerVxHi 
     sta playerVxHi 
     jmp @PlayerFrictionY
 
 @PlayerVxIsNegative:    
-    lda FRICTION_COEF_NEGATIVE_X_LO
+    lda #FRICTION_COEF_POSITIVE_X_LO
     clc 
     adc playerVxLo 
     sta playerVxLo
 
-    lda FRICTION_COEF_POSITIVE_X_HI
+    lda #FRICTION_COEF_POSITIVE_X_HI
     adc playerVxHi
     sta playerVxHi
 
@@ -1527,27 +1370,28 @@ ApplyPlayerFriction:
     asl 
     bcs @PlayerVyIsNegative
     ; Vy is positiver: so use negative friction coef
-    lda FRICTION_COEF_NEGATIVE_Y_LO
+    lda #FRICTION_COEF_NEGATIVE_Y_LO
     clc 
     adc playerVyLo 
     sta playerVyLo 
 
-    lda FRICTION_COEF_NEGATIVE_Y_HI
+    lda #FRICTION_COEF_NEGATIVE_Y_HI
     adc playerVyHi
     sta playerVyHi 
 
     jmp @DonePlayerFriction
 @PlayerVyIsNegative:
-    lda FRICTION_COEF_POSITIVE_Y_LO
+    lda #FRICTION_COEF_POSITIVE_Y_LO
     clc 
     adc playerVyLo
     sta playerVyLo
 
-    lda FRICTION_COEF_POSITIVE_Y_HI
+    lda #FRICTION_COEF_POSITIVE_Y_HI
     adc playerVyHi
     sta playerVyHi 
      
 @DonePlayerFriction:
+   ;jsr CheckPlayerMovingTooSlow
     rts                                        
 
 ; because right now i'm applying friction to Vx and Vy without checking if I should... I need set V to 0 if it is between - Friction coef < V < + friction coef
@@ -1555,8 +1399,12 @@ ApplyPlayerFriction:
     ; i guess its branch minus and branch plus
 
 ; i might have fucked up the +/- 1. it made sense when i was writing it but 2 seconds later it doens't. it has to do with being exactly the coef and wanting or not wanting that to be included in the range.
-
+; x and y are used as flags to set player state to standing if both values get set to 0 so we aren't moving. also known, as, standing
+    ; this might be the worst subroutine i've written in awhile
 CheckPlayerMovingTooSlow:
+    ldy #$00
+    ldx #$00    
+
     lda playerVxHi
     bpl @CheckPlayerMovingVxPositive
 
@@ -1564,11 +1412,12 @@ CheckPlayerMovingTooSlow:
     cmp #$FF
     bne @VxTooFast
     lda playerVxLo
-    cmp FRICTION_COEF_NEGATIVE_X_HI - 1
+    cmp #FRICTION_COEF_NEGATIVE_X_HI
     bcs @VxTooFast
     lda #$00
     sta playerVxHi
     sta playerVxLo
+    ldy #$01
     jmp @VxTooFast
 
     ; this is checking if Vx is postitive. so it should be Hi = $00 and lo < FRICTION_COEF + 1
@@ -1576,11 +1425,12 @@ CheckPlayerMovingTooSlow:
     cmp #$00
     bne @VxTooFast
     lda playerVxLo 
-    cmp FRICTION_COEF_POSITIVE_X_LO + 1
+    cmp #FRICTION_COEF_POSITIVE_X_LO + 1
     bcc @VxTooFast
     lda #$00
     sta playerVxLo 
     sta playerVxHi
+    ldy #$01
 
 @VxTooFast:
     lda playerVyHi
@@ -1588,24 +1438,38 @@ CheckPlayerMovingTooSlow:
     cmp #$FF
     bne @VyTooFast
     lda playerVyLo
-    cmp FRICTION_COEF_NEGATIVE_Y_LO - 1
+    cmp #FRICTION_COEF_NEGATIVE_Y_LO
     bcs @VyTooFast
     lda #$00
     sta playerVyLo
     sta playerVyHi 
+    ldx #$01
     jmp @VyTooFast
 
 @CheckPlayerMovingVyPositive:
     cmp #$00        ; i think there is a zero flag but that can be fixed later
     bne @VyTooFast
     lda playerVyLo 
-    cmp FRICTION_COEF_POSITIVE_Y_LO + 1
+    cmp #FRICTION_COEF_POSITIVE_Y_LO + 1
     bcc @VyTooFast
     lda #$00
     sta playerVyHi
     sta playerVyLo
+    ldx #$01
+     
 
 @VyTooFast:
+; this is checking if we set it to 0 to change to standing state.
+    ; i know its horrible. we want working build. this will get fixed when i inevitably delete it
+    cpy #$01
+    bne @FrictionDone
+    cpx #$01
+    bne @FrictionDone
+    lda #$00
+    jsr ChangePlayerState
+
+@FrictionDone:
+
     rts 
 
     
@@ -1843,10 +1707,10 @@ SetPlayerPositionOneOption:
 
     ldy #$00
     lda (pointerLo), y 
-    sta playerXpos
+    sta playerPxHi
     iny 
     lda (pointerLo), Y
-    sta playerYpos
+    sta playerPyHi
     rts 
 
 SetPlayerPositionMultipleOptions:
@@ -1860,10 +1724,10 @@ SetPlayerPositionMultipleOptions:
 
     ldy temp2    
     lda (pointerLo), y 
-    sta playerXpos
+    sta playerPyHi
     iny 
     lda (pointerLo), Y
-    sta playerYpos 
+    sta playerPyHi
     rts 
 
 
@@ -2077,49 +1941,48 @@ CreateGameObject:
 
     lda (pointerLo),y   
     sta objectXPos,x 
-    iny 
-    lda (pointerLo),y  
+
+    lda (pointerLo + 1),y  
     sta objectXPosFloat,x 
-    iny 
-    lda (pointerLo),y  
+
+    lda (pointerLo + 2),y  
     sta objectYPos,x
-    iny  
-    lda (pointerLo),y   
+
+    lda (pointerLo + 3),y   
     sta objectYPosFloat,x 
-    iny 
-    lda (pointerLo),y  
+
+    lda (pointerLo + 4),y  
     sta objectVar1,x 
-    iny 
-    lda (pointerLo),y   
+
+    lda (pointerLo + 5),y   
     sta objectVar2,x 
-    iny 
-    lda (pointerLo),y  
+
+    lda (pointerLo + 6),y  
     sta objectVar3,x 
-    iny 
-    lda (pointerLo),y  
+
+    lda (pointerLo + 7),y  
     sta objectHi,x 
-    iny 
-    lda (pointerLo),y 
+
+    lda (pointerLo + 8),y 
     sta objectLo,x    
-    iny 
-    lda (pointerLo),y
+
+    lda (pointerLo + 9),y
     sta objectDrawHi,x
-    iny 
-    lda (pointerLo),y 
+
+    lda (pointerLo + 10),y 
     sta objectDrawLo,x 
-    iny  
-    lda (pointerLo),y 
+
+    lda (pointerLo + 11),y 
     sta objectAnimationOffset,x    
-    iny 
-    lda (pointerLo),y 
+
+    lda (pointerLo + 12),y 
     sta objectAnimationTimer,x   
-    iny 
-    lda (pointerLo),y 
+
+    lda (pointerLo + 13),y 
     sta objectState,x    
-    iny 
-    lda (pointerLo),y 
+
+    lda (pointerLo + 14),y 
     sta objectAtt,x 
-    iny 
 
 
     ; I am also going to have an array of current offsets to help the draw function randomize the sprite prio order each frame
@@ -2342,7 +2205,7 @@ DeleteEngine:
 DrawEngine:
     jsr DrawPlayer
 
-    lda GAME_OBJECT_OAM_OFFSET_START
+    lda #GAME_OBJECT_OAM_OFFSET_START
     sta spriteBufferOffset
     ; lets focus on just getting game objects drawn fuck everything else right now
     lda #$00
@@ -2403,7 +2266,7 @@ DrawPlayer:
     lda playerFacingDirection
     asl 
     tay 
-    ldx PlayerState
+    ldx playerState
 
     lda PlayerMetaSpriteDataLo,x 
     sta pointerLo
@@ -2411,10 +2274,10 @@ DrawPlayer:
     sta pointerHi
 
     lda (pointerLo),y 
-    sta pointerLo2 
+    sta pointer2Lo
     iny 
     lda (pointerLo),y 
-    sta pointerHi2
+    sta pointer2Hi
 
     lda playerAnimationOffset
     asl 
@@ -2437,19 +2300,19 @@ DrawPlayer:
     adc playerPyHi
     sta PLAYER_OAM_START,y 
 
-    lda (pointerLo),y + 1           ; tile
-    sta PLAYER_OAM_START,y + 1
+    lda (pointerLo + 1),y           ; tile
+    sta PLAYER_OAM_START + 1,y
 
-    lda (pointerLo),y + 2           ; attribute
-    sta PLAYER_OAM_START,y + 2
+    lda (pointerLo + 2),y           ; attribute
+    sta PLAYER_OAM_START + 2,y
 
-    lda (pointerLo),y + 3
+    lda (pointerLo + 3),y
     clc 
     ; adc playerXPos
     adc playerPxHi
-    sta PLAYER_OAM_START,y + 3
+    sta PLAYER_OAM_START + 3,y
 
-    cpx PLAYER_TILE_COUNT           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
+    cpx #PLAYER_TILE_COUNT           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
     beq @DoneDrawingPlayer
 
     iny                             ; increment y by 4 to start accessing next sprite meta data
@@ -2464,8 +2327,21 @@ DrawPlayer:
     rts 
 
 
-
-
+InitializePlayer:
+    lda #$00
+    sta playerState
+    sta playerPxLo
+    sta playerPxHi 
+    sta playerPyLo 
+    sta playerPyHi 
+    sta playerVxLo
+    sta playerVxHi
+    sta playerVyLo
+    sta playerVyHi
+    sta playerAnimationOffset
+    sta playerAnimationTimer
+    sta playerFacingDirection
+    rts 
 
 
 
@@ -2658,13 +2534,13 @@ clearnametables:
     jsr loadpalettes 
 
     lda #$00
-    sta playerState2
+    sta playerState
     sta globalTimerOffset
 
     lda #$40
     sta spriteBufferOffset
 
-    jsr loadSprites
+    jsr InitializePlayer
     jsr updateSprites
 
     jsr loadbackground
@@ -2713,6 +2589,9 @@ Main:
     jsr Timer2
     jsr ReadController1
     jsr PlayerLogic
+    jsr PhysicsEngine
+    jsr ApplyPlayerFriction
+    jsr UpdatePlayerPosition
     jsr GameEngine
 
     ldx #$02
@@ -2790,10 +2669,7 @@ StartingPosLo:
 StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
-RoomInteractLo:
-    .byte <JamesRoomInteract, <LivingRoomInteract, <ScottRoomInteract, <BathroomInteract
-RoomInteractHi:
-    .byte >JamesRoomInteract, >LivingRoomInteract, >ScottRoomInteract, >BathroomInteract
+
 
 RoomBasedEventsLo:
     .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <BathroomBasedEvents - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
@@ -3128,30 +3004,7 @@ Outside1StartPos:
 Outside2StartPos:
     .byte $80,$80
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;   Interact Tables
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; James Room
-; x, y, hi, low - 1
-JamesRoomInteract:
-    .byte $02       ; count
-    .byte $80, $80, >InteractTestFunction1, <InteractTestFunction1 - 1  ; location of the interactable object
-    .byte $A0, $88, >InteractTestFunction2, <InteractTestFunction2 - 1
-
-LivingRoomInteract:
-    .byte $00
-
-ScottRoomInteract:
-    .byte $00
-
-BathroomInteract:
-    .byte $01
-    .byte $90, $30, >ToiletInteract, <ToiletInteract - 1
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3528,33 +3381,7 @@ StoreBackground:        ; roomIndex: 5
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
     .byte $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-sprites: ;  y  tile  att  x
-    .byte $FE, $fe, $fe, $fe    ; 0 sprite off the screen (maybe status bar or something)
-    .byte $80, $10, $00, $80 ; YCoord, tile number, attr, XCoord
-    .byte $10, $00, $00, $10        ; 1's digit of timer sprite
-    .byte $10, $00, $00, $08        ; 10s digit of timer sprite
-    .byte $20, $00, $00, $10        ; 1s digit of timer2
-    .byte $20, $00, $00, $08        ; 10s digit of timer 2
-
-    .byte $20, $00, $00, $80        ; score 1s
-    .byte $20, $00, $00, $78        ; score 10s
-    .byte $20, $00, $00, $70        ; score 100s
-    .byte $20, $09, $00, $68        ; score 1000s
-    .byte $20, $00, $00, $60        ; score 10000s
-
-    .byte $88, $00, $00, $A0
-    .byte $80, $00, %00100000, $80        ; scott
-
-        ;; weird idea. what if i just like yolo the sprites. like. is this what a buffer is? cause ive understood the conecpt but never the freaking impelmentation. 
-                ;; so like. instead of writing directly to $02XX, is it better to write somewhere else... i guess as i write that out it seems like a no.. idk.
-                ;; hmm let me think. I guess one thing thats semi related i guess. but like. right now every entity is hard coded. and for timers i guess that makes sense, and same for palyer.
-                ;; but do I need every npc location known at all times. or at least taking up memory? 
-                ;; so I'll need to write a better sprite and background shit probs. idk if I can with back ground, but at least... idk i think doing mapping can be saved for next proj
-                ;; who knows though
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   

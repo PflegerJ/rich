@@ -689,3 +689,224 @@ Interact:
     ; after all that fun stuff i need to make sure to know if i can i need to end playerlogic cause im stuck in that interaction and for how long or if i can keep moving or something
         ; i think im getting ahead of myself. god im just so fried but im glad im at least thinking about it. i'll code it out tomorrow and it will be rough cause i'll have to remmeber everything but thats ok i got this
     rts 
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;   Interact Tables
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; James Room
+; x, y, hi, low - 1
+JamesRoomInteract:
+    .byte $02       ; count
+    .byte $80, $80, >InteractTestFunction1, <InteractTestFunction1 - 1  ; location of the interactable object
+    .byte $A0, $88, >InteractTestFunction2, <InteractTestFunction2 - 1
+
+LivingRoomInteract:
+    .byte $00
+
+ScottRoomInteract:
+    .byte $00
+
+BathroomInteract:
+    .byte $01
+    .byte $90, $30, >ToiletInteract, <ToiletInteract - 1
+
+    RoomInteractLo:
+    .byte <JamesRoomInteract, <LivingRoomInteract, <ScottRoomInteract, <BathroomInteract
+RoomInteractHi:
+    .byte >JamesRoomInteract, >LivingRoomInteract, >ScottRoomInteract, >BathroomInteract
+
+
+
+
+    moveUp:
+    dec playerYpos
+    lda playerYpos
+    clc
+    adc #$01
+    tay
+    ldx playerXpos
+    jsr check_background_collision
+    beq @checkRightPixel
+    inc playerYpos
+
+@checkRightPixel:
+    lda playerYpos
+    clc
+    adc #$01
+    tay
+    lda playerXpos
+    clc
+    adc #$07
+    tax
+    jsr check_background_collision
+    beq @noCollision
+    inc playerYpos
+    rts
+
+@noCollision:
+    jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr LoadRoom
+   ; jsr loadbackground
+@NoLoadingZoneFound:
+    rts
+
+moveDown:
+    inc playerYpos
+    lda playerYpos
+    clc
+    adc #$08
+    tay
+    ldx playerXpos
+    jsr check_background_collision
+    beq @checkRightPixel
+    DEC playerYpos
+
+@checkRightPixel:
+    lda playerYpos
+    clc
+    adc#$08
+    tay
+    lda playerXpos
+    clc
+    adc #$07
+    tax
+    jsr check_background_collision
+    beq @noCollision
+    dec playerYpos
+    rts
+
+@noCollision:
+    jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr LoadRoom
+   ; jsr loadbackground
+@NoLoadingZoneFound:
+    rts
+
+;; x + 7, y + 1 to deal with position being x (x, y - 1) of where the sprite is drawn
+moveRight:
+    inc playerXpos
+    lda playerXpos
+    clc
+    adc #07
+    tax 
+    lda playerYpos
+    clc
+    adc #$01
+    tay
+    jsr check_background_collision
+    beq @checkBottomPixel
+    dec playerXpos
+
+@checkBottomPixel:
+    lda playerXpos
+    clc
+    adc #$07
+    tax
+    lda playerYpos
+    clc
+    adc #$08
+    tay
+    jsr check_background_collision
+    beq @noCollision
+    dec playerXpos
+    rts 
+@noCollision:
+    jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr LoadRoom
+    ;jsr loadbackground
+@NoLoadingZoneFound:
+    rts 
+
+
+
+moveLeft:
+    dec playerXpos
+    ldx playerXpos
+    lda playerYpos
+    clc
+    adc #$01
+    tay
+    jsr check_background_collision
+    beq @checkBottomPixel
+    inc playerXpos
+
+@checkBottomPixel:
+    ldx playerXpos
+    lda playerYpos
+    clc
+    adc #$08
+    tay
+    jsr check_background_collision
+    beq @noCollision
+    inc playerXpos
+    rts
+
+@noCollision:
+    jsr checkLoadingZone
+    lda temp1
+    cmp #$FF
+    bne @NoLoadingZoneFound
+    jsr LoadRoom
+   ; jsr loadbackground
+@NoLoadingZoneFound:
+    rts 
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+sprites: ;  y  tile  att  x
+    .byte $FE, $fe, $fe, $fe    ; 0 sprite off the screen (maybe status bar or something)
+    .byte $80, $10, $00, $80 ; YCoord, tile number, attr, XCoord
+    .byte $10, $00, $00, $10        ; 1's digit of timer sprite
+    .byte $10, $00, $00, $08        ; 10s digit of timer sprite
+    .byte $20, $00, $00, $10        ; 1s digit of timer2
+    .byte $20, $00, $00, $08        ; 10s digit of timer 2
+
+    .byte $20, $00, $00, $80        ; score 1s
+    .byte $20, $00, $00, $78        ; score 10s
+    .byte $20, $00, $00, $70        ; score 100s
+    .byte $20, $09, $00, $68        ; score 1000s
+    .byte $20, $00, $00, $60        ; score 10000s
+
+    .byte $88, $00, $00, $A0
+    .byte $80, $00, %00100000, $80        ; scott
+
+        ;; weird idea. what if i just like yolo the sprites. like. is this what a buffer is? cause ive understood the conecpt but never the freaking impelmentation. 
+                ;; so like. instead of writing directly to $02XX, is it better to write somewhere else... i guess as i write that out it seems like a no.. idk.
+                ;; hmm let me think. I guess one thing thats semi related i guess. but like. right now every entity is hard coded. and for timers i guess that makes sense, and same for palyer.
+                ;; but do I need every npc location known at all times. or at least taking up memory? 
+                ;; so I'll need to write a better sprite and background shit probs. idk if I can with back ground, but at least... idk i think doing mapping can be saved for next proj
+                ;; who knows though
+
+loadSprites:
+    ;lda spriteCount   ; this will be used when each map knows how many sprites it has on load
+   ; asl
+    ;asl
+    ldx #$00
+spriteLoop:
+    lda sprites, X
+    sta SPRITE_RAM, X
+    inx
+    cpx #$34
+    bne spriteLoop
+    rts
