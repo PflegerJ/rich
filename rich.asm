@@ -1339,7 +1339,9 @@ DetermineFacingDirection:
 
 ; i think there is a cuter way to do this with offsets. i will look into that when i revisit. not a priority rn but i can see how that pattern really can be used everywhere. and since its basically the onlything the cpu can do i assume i should be using it where i can
 ApplyPlayerFriction:
-
+    lda #$01 
+    cmp playerState
+    bne @IShouldntBeHere
     ; basically we need to know if we are moving + or -. and then add the opposite. idk if we need to round to 0 here? or somehwere else. somewhere else seems right but i don't know why yet so i'll do it here
     lda playerVxHi 
     asl     ; should store the msb in the carry so we can use that 
@@ -1391,7 +1393,8 @@ ApplyPlayerFriction:
     sta playerVyHi 
      
 @DonePlayerFriction:
-   ;jsr CheckPlayerMovingTooSlow
+    jsr CheckPlayerMovingTooSlow
+@IShouldntBeHere:
     rts                                        
 
 ; because right now i'm applying friction to Vx and Vy without checking if I should... I need set V to 0 if it is between - Friction coef < V < + friction coef
