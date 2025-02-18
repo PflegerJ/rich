@@ -1201,8 +1201,8 @@ PhysicsEngine:
     ; first lets just check if we need to do anything based on the players state
     lda #$01
     cmp playerState
-    bcc @NoPlayerPhysics                    ; i think its bcc. carry is set when a => value. so is 1 >= state. state should be 1 or 0. so is 1 >= 1 is 1>= 0. so the carry would be set. so bcc means 1 >= 2 which would mean we in a non moving state so no physics. 
-                                    ; this will probably be changed but it makes sense i think
+    beq @PlayerPhysics                    ; i think its bcc. carry is set when a => value. so is 1 >= state. state should be 1 or 0. so is 1 >= 1 is 1>= 0. so the carry would be set. so bcc means 1 >= 2 which would mean we in a non moving state so no physics. 
+    rts                                 ; this will probably be changed but it makes sense i think
 @PlayerPhysics:
     ; first lets combine pressed and held input cause i don't think we need to care......
     lda controller1Pressed
@@ -1231,6 +1231,10 @@ PhysicsEngine:
     lda #PLAYER_X_ACCELERATION_NEGATIVE_HI
     adc playerVxHi 
     sta playerVxHi
+    cmp #PLAYER_Vx_NEGATIVE_CAP
+    bne @NoRightLeftInput
+    lda #$00
+    sta playerVxLo
     ; Idk if i should check for cap here or not. lets ignore the cap for now. cause just like every single design choice. i can see positive's and negatives for implementing now and for doing a catch all check at the end
 
     jmp @NoRightLeftInput   ; maybe a bad label name lol
@@ -1243,6 +1247,10 @@ PhysicsEngine:
     lda #PLAYER_X_ACCELERATION_POSITIVE_HI
     adc playerVxHi
     sta playerVxHi
+    cmp #PLAYER_Vx_POSITIVE_CAP
+    bne @NoRightLeftInput
+    lda #$00 
+    sta playerVxLo
 
 ; i feel like there is better way to do the bit isolating and comparing but its ok
 @NoRightLeftInput:
@@ -1262,7 +1270,14 @@ PhysicsEngine:
 
     lda #PLAYER_Y_ACCELERATION_POSITIVE_HI
     adc playerVyHi 
-    sta playerVyHi 
+    sta playerVyHi
+    cmp #PLAYER_Vy_POSITIVE_CAP
+    beq @AtVyPosCap 
+    jmp @NoUpDownInput
+
+@AtVyPosCap:
+    lda #$00
+    sta playerVyLo 
     jmp @NoUpDownInput
 
 @YesUpInput:
@@ -1274,28 +1289,39 @@ PhysicsEngine:
     lda #PLAYER_Y_ACCELERATION_NEGATIVE_HI
     adc playerVyHi
     sta playerVyHi 
+    cmp #PLAYER_Vy_NEGATIVE_CAP
+    beq @AtVyNegCap
+    jmp @NoUpDownInput
 
+@AtVyNegCap:
+    lda #$00
+    sta playerVyLo
     ; so now we have updated the player's velocity based off player input.
-    ; 
+    ;
+
+
 
 @NoUpDownInput:
+    ; this is going to be a janky V cap
+    jsr ApplyPlayerFriction
+
 @NoPlayerPhysics:
     rts 
 
-PLAYER_X_ACCELERATION_POSITIVE_HI = $00
+PLAYER_X_ACCELERATION_POSITIVE_HI = $01
 PLAYER_X_ACCELERATION_POSITIVE_LO = $C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
-PLAYER_X_ACCELERATION_NEGATIVE_HI = $FF
+PLAYER_X_ACCELERATION_NEGATIVE_HI = $FE
 PLAYER_X_ACCELERATION_NEGATIVE_LO = $50
 
-PLAYER_Y_ACCELERATION_POSITIVE_HI = $00
+PLAYER_Y_ACCELERATION_POSITIVE_HI = $01
 PLAYER_Y_ACCELERATION_POSITIVE_LO = $C0 ; this should be $00C0 which means 0.75 i think. or i am still way lost
-PLAYER_Y_ACCELERATION_NEGATIVE_HI = $FF
+PLAYER_Y_ACCELERATION_NEGATIVE_HI = $FE
 PLAYER_Y_ACCELERATION_NEGATIVE_LO = $50
 
-PLAYER_Vx_POSITIVE_CAP = $08
-PLAYER_Vy_POSITIVE_CAP = $08
-PLAYER_Vx_NEGATIVE_CAP = $F8
-PLAYER_Vy_NEGATIVE_CAP = $F8
+PLAYER_Vx_POSITIVE_CAP = $02
+PLAYER_Vy_POSITIVE_CAP = $02
+PLAYER_Vx_NEGATIVE_CAP = $FD
+PLAYER_Vy_NEGATIVE_CAP = $FD
 
 FRICTION_COEF_POSITIVE_X_HI = $00
 FRICTION_COEF_POSITIVE_X_LO = $40
@@ -1312,6 +1338,10 @@ FRICTION_COEF_NEGATIVE_Y_LO = $E0
 ; basically i am assuming that i will calculated the player Vx and Vy. and then i can just call this. in a dream world, this would even naturally go to 0 and swap to standing state.
     ; which is making wonder if I need previous Vx and Vy but got thats so many bytes
 UpdatePlayerPosition:
+    lda #$01
+    cmp playerState
+    bne @WrongState
+
     lda playerVxLo 
     clc 
     adc playerPxLo
@@ -1329,6 +1359,8 @@ UpdatePlayerPosition:
     lda playerVyHi 
     adc playerPyHi
     sta playerPyHi 
+
+@WrongState:
     rts 
 
 DetermineFacingDirection:
@@ -1415,7 +1447,7 @@ CheckPlayerMovingTooSlow:
     cmp #$FF
     bne @VxTooFast
     lda playerVxLo
-    cmp #FRICTION_COEF_NEGATIVE_X_HI
+    cmp #FRICTION_COEF_NEGATIVE_X_LO + 1
     bcs @VxTooFast
     lda #$00
     sta playerVxHi
@@ -1441,7 +1473,7 @@ CheckPlayerMovingTooSlow:
     cmp #$FF
     bne @VyTooFast
     lda playerVyLo
-    cmp #FRICTION_COEF_NEGATIVE_Y_LO
+    cmp #FRICTION_COEF_NEGATIVE_Y_LO + 1
     bcs @VyTooFast
     lda #$00
     sta playerVyLo
@@ -2258,7 +2290,7 @@ DrawEngineJmp:
 ; this should work. maybe i messed up some of the pointer shit but the logic is right. it would be little tweaks in the syntax 
 ; this is law now. ok time to work backwards fixing the hell i created at the beginning of this project.
 
-PLAYER_STANDING_DOWN_ANIMATION_TIME     = $0F
+PLAYER_STANDING_DOWN_ANIMATION_TIME     = $08
 DrawPlayer:
     ; so same idea as any general game object
     ; use the state as offset on PlayerMetaSpriteDataLo/Hi to get the PlayerSTATE
@@ -2302,26 +2334,23 @@ DrawPlayer:
     ; adc playerYPos
     adc playerPyHi
     sta PLAYER_OAM_START,y 
-
-    lda (pointerLo + 1),y           ; tile
-    sta PLAYER_OAM_START + 1,y
-
-    lda (pointerLo + 2),y           ; attribute
-    sta PLAYER_OAM_START + 2,y
-
-    lda (pointerLo + 3),y
+    iny 
+    lda (pointerLo),y           ; tile
+    sta PLAYER_OAM_START,y
+    iny 
+    lda (pointerLo),y           ; attribute
+    sta PLAYER_OAM_START,y
+    iny 
+    lda (pointerLo),y
     clc 
     ; adc playerXPos
     adc playerPxHi
-    sta PLAYER_OAM_START + 3,y
+    sta PLAYER_OAM_START,y
 
     cpx #PLAYER_TILE_COUNT           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
     beq @DoneDrawingPlayer
 
     iny                             ; increment y by 4 to start accessing next sprite meta data
-    iny 
-    iny 
-    iny 
     inx                             ; inc loop counter
 
     jmp @DrawPlayerLoopStart
@@ -2593,7 +2622,7 @@ Main:
     jsr ReadController1
     jsr PlayerLogic
     jsr PhysicsEngine
-    jsr ApplyPlayerFriction
+    ;jsr ApplyPlayerFriction
     jsr UpdatePlayerPosition
     jsr GameEngine
 
@@ -2764,9 +2793,9 @@ PlayerStandingRightFrame2:
 
 
 PlayerWalkingDownFrame1:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $CD, $00, $00,     $08, $DD, $00, $08,     $10, $CE, $00, $00,     $10, $DE, $00, $08
 PlayerWalkingDownFrame2:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $ED, $00, $00,     $08, $FD, $00, $08,     $10, $EE, $00, $00,     $10, $EF, $00, $08
 
 PlayerWalkingLeftFrame1:
     .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
