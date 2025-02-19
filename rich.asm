@@ -1173,6 +1173,7 @@ PlayerStandingLogic:
     rts 
 
 PLAYER_STANDING_ANIMATION_FRAME_COUNT   =   2
+PLAYER_WALKING_ANIMATION_FRAME_COUNT    =   2
 PlayerStandingAnimationFrameTimes:
     .byte $FF, $88 
 
@@ -1673,7 +1674,7 @@ LivingRoomUnLoad:
     jsr ScottUnload
     
     rts 
-
+.byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 ;; so im using the roomindex as an index to get the right player starting pos. i get room index, make sure its just the last 3 bits, then get the values at that index for starting pos.
 JamesRoomLoad:  
     jsr SetPlayerPositionOneOption
@@ -2661,6 +2662,7 @@ VBLANK:
     
     RTI 
 
+;.segment "RODATA"
 
 Palette:
     .byte $22, $29, $1a, $0F, $22, $36, $17, $0F, $22, $30, $21, $0F, $0f, $0f, $0f, $0F  ; background palette data
@@ -2702,14 +2704,14 @@ StartingPosHi:
     .byte >JamesRoomStartPos, >LivingRoomStartPos, >ScottRoomStartPos, >BathroomStartPos, >BalconyStartPos, >StoreStartPos, >Outside1StartPos, >Outside2StartPos
 
 
-
 RoomBasedEventsLo:
     .byte <DoNothing - 1, <LivingRoomTestFunction - 1, <DoNothing - 1, <BathroomBasedEvents - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1, <DoNothing - 1
 RoomBasedEventsHi:
     .byte >DoNothing, >LivingRoomTestFunction, >DoNothing, >BathroomBasedEvents, >DoNothing, >DoNothing, >DoNothing, >DoNothing
 
 RoomLoadingLo:
-    .byte <JamesRoomLoad - 1, <LivingRoomLoad - 1, <ScottRoomLoad - 1, <BathRoomLoad - 1, <BalconyLoad - 1
+    .byte   <JamesRoomLoad - 1
+    .byte   <LivingRoomLoad - 1, <ScottRoomLoad - 1, <BathRoomLoad - 1, <BalconyLoad - 1
 RoomLoadingHi:
     .byte >JamesRoomLoad, >LivingRoomLoad, >ScottRoomLoad, >BathRoomLoad, >BalconyLoad
 
