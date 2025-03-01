@@ -1192,9 +1192,23 @@ ChangePlayerState:
         ; let yourself discover instead of theorize
 PlayerWalkingLogic:
     ; i need to check if they hit A or not cause i think you should be able to hit a while moving
+    inc playerAnimationTimer
+    ldx playerAnimationOffset
+    lda PlayerWalkingAnimationFrameTimes,x 
+    cmp playerAnimationTimer
+    bne @DonePlayerWalking
+    ldy #$00
+    sty playerAnimationTimer
+    inc playerAnimationOffset
+    lda #PLAYER_WALKING_ANIMATION_FRAME_COUNT
+    cmp playerAnimationOffset
+    bne @DonePlayerWalking
+    sty playerAnimationOffset
+@DonePlayerWalking:
     rts 
 
-
+PlayerWalkingAnimationFrameTimes:
+    .byte $0F, $0F
 ; ok time to make a really mid phy eng
 ; so right now im only thinking about the player
 ; you got this
@@ -1231,14 +1245,29 @@ PhysicsEngine:
 
     lda #PLAYER_X_ACCELERATION_NEGATIVE_HI
     adc playerVxHi 
-    sta playerVxHi
-    cmp #PLAYER_Vx_NEGATIVE_CAP
-    bne @NoRightLeftInput
-    lda #$00
+    cmp #PLAYER_Vx_NEGATIVE_CAP - 1
+    bcc @AtVxNegCap
+    sta playerVxHi 
+    jmp @NoRightLeftInput
+
+@AtVxNegCap:
+    lda #$00 
     sta playerVxLo
+    lda #PLAYER_Vx_NEGATIVE_CAP
+    sta playerVxHi
+    jmp @NoRightLeftInput    
+
+
+   ; sta playerVxHi
+   ; cmp #PLAYER_Vx_NEGATIVE_CAP
+   ; bne @NoRightLeftInput
+   ; lda #$00
+   ; sta playerVxLo
+   ; lda #PLAYER_Vx_NEGATIVE_CAP
+   ; sta playerVxHi
     ; Idk if i should check for cap here or not. lets ignore the cap for now. cause just like every single design choice. i can see positive's and negatives for implementing now and for doing a catch all check at the end
 
-    jmp @NoRightLeftInput   ; maybe a bad label name lol
+    ;jmp @NoRightLeftInput   ; maybe a bad label name lol
 @YesRightInput:
     lda #PLAYER_X_ACCELERATION_POSITIVE_LO
     clc 
@@ -1247,11 +1276,16 @@ PhysicsEngine:
 
     lda #PLAYER_X_ACCELERATION_POSITIVE_HI
     adc playerVxHi
-    sta playerVxHi
     cmp #PLAYER_Vx_POSITIVE_CAP
-    bne @NoRightLeftInput
+    bcs @AtVxPosCap
+    sta playerVxHi
+    jmp @NoRightLeftInput
+
+@AtVxPosCap:
     lda #$00 
     sta playerVxLo
+    lda #PLAYER_Vx_POSITIVE_CAP
+    sta playerVxHi 
 
 ; i feel like there is better way to do the bit isolating and comparing but its ok
 @NoRightLeftInput:
@@ -1273,12 +1307,14 @@ PhysicsEngine:
     adc playerVyHi 
     sta playerVyHi
     cmp #PLAYER_Vy_POSITIVE_CAP
-    beq @AtVyPosCap 
+    bcs @AtVyPosCap 
     jmp @NoUpDownInput
 
-@AtVyPosCap:
+@AtVyPosCap:            ; this is truly horrible. idc the cap shouldn't even be here. 
     lda #$00
-    sta playerVyLo 
+    sta playerVyLo
+    lda #PLAYER_Vy_POSITIVE_CAP
+    sta playerVyHi 
     jmp @NoUpDownInput
 
 @YesUpInput:
@@ -1289,14 +1325,17 @@ PhysicsEngine:
 
     lda #PLAYER_Y_ACCELERATION_NEGATIVE_HI
     adc playerVyHi
-    sta playerVyHi 
+    
     cmp #PLAYER_Vy_NEGATIVE_CAP
-    beq @AtVyNegCap
+    bcc @AtVyNegCap
+    sta playerVyHi 
     jmp @NoUpDownInput
 
 @AtVyNegCap:
     lda #$00
     sta playerVyLo
+    lda #PLAYER_Vy_NEGATIVE_CAP
+    sta playerVyHi
     ; so now we have updated the player's velocity based off player input.
     ;
 
@@ -1305,7 +1344,7 @@ PhysicsEngine:
 @NoUpDownInput:
     ; this is going to be a janky V cap
     jsr ApplyPlayerFriction
-
+    jsr CalculateFacingDirection
 @NoPlayerPhysics:
     rts 
 
@@ -1517,7 +1556,65 @@ SetPlayerVelocityToZero:
     sta playerVyLo 
     rts 
 
+CalculateFacingDirection:
+    lda playerState
+    cmp #$01 
+    beq @ActuallyCalc
+    rts 
+@ActuallyCalc:
+    lda playerVxHi 
+    bpl @PlayerVxIsPositive
+    eor #$FF
+    clc 
+    adc #$01 
+@PlayerVxIsPositive:
+    sta temp1 
+    lda playerVyHi 
+    bpl @PlayerVyIsPositive
+    eor #$FF
+    clc 
+    adc #$01
+@PlayerVyIsPositive:
+    ; Vy is in A. vx is in temp1
+    ; A >= mem carry is set
+    ; a == mem zero is set
+    ; a < mem n is set
+    cmp temp1 
+    beq @CheckingLo
+    bcs @VyBigger
+@VxBigger:
+    lda playerVxHi
+    bpl @FacingLeft
+    ldy #$03
+    jmp @DoneWithChange
+@FacingLeft:
+    ldy #$01
+    jmp @DoneWithChange
 
+@VyBigger:
+    lda playerVyHi 
+    bpl @FacingUp
+    ; we are facing down
+    ldy #$00
+    jmp @DoneWithChange
+@FacingUp:
+    ldy #$02
+    jmp @DoneWithChange
+@CheckingLo:
+    lda playerVyLo 
+    cmp playerVxLo 
+    beq @DoneDoneWithChange
+    bcs @VyBigger
+    jmp @VxBigger
+@DoneWithChange:
+    sty playerFacingDirection
+    ldy #$00    ; the one stupid ass save was in fact. not one. love it
+    sty playerAnimationOffset
+    sty playerAnimationTimer
+@DoneDoneWithChange:
+    rts 
+; future thought. could treat x and y facing dir seperately. and then use previous or random to choose. not exactly but idea is there. math is easier spliting it so code might also be easier
+; also do i need to reset animation timer? cause might look weirder if i flip facing dir constantly to never actually take a step
 ControllerLogic:
     jsr ReadController1
     
@@ -2795,9 +2892,9 @@ PlayerStandingRightFrame2:
 
 
 PlayerWalkingDownFrame1:
-    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $CD, $00, $00,     $08, $DD, $00, $08,     $10, $CE, $00, $00,     $10, $DE, $00, $08
+    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $DC, $00, $00,     $08, $DD, $00, $08,     $10, $EC, $00, $00,     $10, $ED, $00, $08
 PlayerWalkingDownFrame2:
-    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $ED, $00, $00,     $08, $FD, $00, $08,     $10, $EE, $00, $00,     $10, $EF, $00, $08
+    .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $DE, $00, $00,     $08, $DF, $00, $08,     $10, $EE, $00, $00,     $10, $EF, $00, $08
 
 PlayerWalkingLeftFrame1:
     .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
