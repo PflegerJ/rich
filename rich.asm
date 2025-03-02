@@ -1175,7 +1175,7 @@ PlayerStandingLogic:
 PLAYER_STANDING_ANIMATION_FRAME_COUNT   =   2
 PLAYER_WALKING_ANIMATION_FRAME_COUNT    =   2
 PlayerStandingAnimationFrameTimes:
-    .byte $FF, $88 
+    .byte $08, $10 
 
 
     ; the state to change to needs to be set in A before you call this
@@ -1584,21 +1584,21 @@ CalculateFacingDirection:
     bcs @VyBigger
 @VxBigger:
     lda playerVxHi
-    bpl @FacingLeft
-    ldy #$03
-    jmp @DoneWithChange
-@FacingLeft:
+    bpl @FacingRight
     ldy #$01
+    jmp @DoneWithChange
+@FacingRight:
+    ldy #$03
     jmp @DoneWithChange
 
 @VyBigger:
     lda playerVyHi 
-    bpl @FacingUp
-    ; we are facing down
-    ldy #$00
-    jmp @DoneWithChange
-@FacingUp:
+    bpl @FacingDown
+    ; we are facing Up
     ldy #$02
+    jmp @DoneWithChange
+@FacingDown:
+    ldy #$00
     jmp @DoneWithChange
 @CheckingLo:
     lda playerVyLo 
@@ -1607,6 +1607,8 @@ CalculateFacingDirection:
     bcs @VyBigger
     jmp @VxBigger
 @DoneWithChange:
+    cpy playerFacingDirection
+    beq @DoneDoneWithChange
     sty playerFacingDirection
     ldy #$00    ; the one stupid ass save was in fact. not one. love it
     sty playerAnimationOffset
@@ -2445,7 +2447,7 @@ DrawPlayer:
     adc playerPxHi
     sta PLAYER_OAM_START,y
 
-    cpx #PLAYER_TILE_COUNT           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
+    cpx #PLAYER_TILE_COUNT - 1           ; exit loop after copying PLAYER_TILE_COUNT sprites for player
     beq @DoneDrawingPlayer
 
     iny                             ; increment y by 4 to start accessing next sprite meta data
@@ -2840,7 +2842,7 @@ PlayerMetaSpriteDataHi:
 
 
 PlayerStanding:
-    .byte <PlayerStandingDown, >PlayerStandingDown, <PlayerStandingLeft, >PlayerStandingLeft, <PlayerStandingUp, >PlayerStandingUp, <PlayerStandingRight, <PlayerStandingRight
+    .byte <PlayerStandingDown, >PlayerStandingDown, <PlayerStandingLeft, >PlayerStandingLeft, <PlayerStandingUp, >PlayerStandingUp, <PlayerStandingRight, >PlayerStandingRight
 PlayerWalking:
     .byte <PlayerWalkingDown, >PlayerWalkingDown, <PlayerWalkingLeft, >PlayerWalkingLeft, <PlayerWalkingUp, >PlayerWalkingUp, <PlayerWalkingRight, >PlayerWalkingRight
 
@@ -2871,7 +2873,7 @@ PlayerWalkingRight:
 PlayerStandingDownFrame1:
     .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $98, $00, $00,     $08, $99, $00, $08,     $10, $A8, $00, $00,     $10, $A9, $00, $08
 PlayerStandingDownFrame2:
-    .byte $00, $00, $8A, $00,   $00, $8B, $00, $08,     $08, $9A, $00, $00,     $08, $9B, $00, $08,     $10, $AA, $00, $00,     $10, $AB, $00, $08
+    .byte $00, $8A, $00, $00,   $00, $8B, $00, $08,     $08, $9A, $00, $00,     $08, $9B, $00, $08,     $10, $AA, $00, $00,     $10, $AB, $00, $08
 
 PlayerStandingLeftFrame1:
     .byte $00, $8C, $00, $00,   $00, $8D, $00, $08,     $08, $9C, $00, $00,     $08, $9D, $00, $08,     $10, $AC, $00, $00,     $10, $AD, $00, $08
@@ -2886,9 +2888,9 @@ PlayerStandingUpFrame2:
 
 
 PlayerStandingRightFrame1:
-    .byte $00, $8C, $40, $00,   $00, $8D, $40, $08,     $08, $9C, $40, $00,     $08, $9D, $40, $08,     $10, $AC, $40, $00,     $10, $AD, $40, $08
+    .byte $00, $8D, %01000000, $00,   $00, $8C, %01000000, $08,     $08, $9D, %01000000, $00,     $08, $9C, %01000000, $08,     $10, $AD, %01000000, $00,     $10, $AC, %01000000, $08
 PlayerStandingRightFrame2:
-    .byte $00, $8E, $40, $00,   $00, $8F, $40, $08,     $08, $9E, $40, $00,     $08, $9F, $40, $08,     $10, $AE, $40, $00,     $10, $AF, $40, $08
+    .byte $00, $8F, %01000000, $00,   $00, $8E, %01000000, $08,     $08, $9F, %01000000, $00,     $08, $9E, %01000000, $08,     $10, $AF, %01000000, $00,     $10, $AE, %01000000, $08
 
 
 PlayerWalkingDownFrame1:
@@ -2897,19 +2899,19 @@ PlayerWalkingDownFrame2:
     .byte $00, $88, $00, $00,   $00, $89, $00, $08,     $08, $DE, $00, $00,     $08, $DF, $00, $08,     $10, $EE, $00, $00,     $10, $EF, $00, $08
 
 PlayerWalkingLeftFrame1:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $8C, $00, $00,   $00, $8D, $00, $08,     $08, $BC, $00, $00,     $08, $BD, $00, $08,     $10, $CC, $00, $00,     $10, $CD, $00, $08
 PlayerWalkingLeftFrame2:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $8C, $00, $00,   $00, $8D, $00, $08,     $08, $BE, $00, $00,     $08, $BF, $00, $08,     $10, $CE, $00, $00,     $10, $CF, $00, $08
 
 PlayerWalkingUpFrame1:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $B8, $00, $00,   $00, $B9, $00, $08,     $08, $E8, $00, $00,     $08, $E9, $00, $08,     $10, $F8, $00, $00,     $10, $F9, $00, $08
 PlayerWalkingUpFrame2:
-    .byte $00, $00, $00, $00,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $BA, $00, $00,   $00, $BB, $00, $08,     $08, $EA, $00, $00,     $08, $EB, $00, $08,     $10, $FA, $00, $00,     $10, $FB, $00, $08
 
 PlayerWalkingRightFrame1:
-    .byte $00, $40, $00, $40,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $8D, %01000000, $00,     $00, $8C, %01000000, $08,   $08, $BD, %01000000, $00,   $08, $BC, %01000000, $08,   $10, $CD, %01000000, $00,   $10, $CC, %01000000, $08
 PlayerWalkingRightFrame2:
-    .byte $00, $40, $00, $40,   $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00,     $00, $00, $00, $00
+    .byte $00, $8D, %01000000, $00,     $00, $8C, %01000000, $08,   $08, $BF, %01000000, $00,   $08, $BE, %01000000, $08,   $10, $CF, %01000000, $00,   $10, $CE, %01000000, $08
 
     
    
